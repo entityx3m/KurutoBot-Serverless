@@ -1,66 +1,86 @@
+import crypto from 'crypto';
+
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-async function parseRawBody(req) {
+// Parse raw body
+const getRawBody = (req) => {
   return new Promise((resolve) => {
     let data = '';
-    req.on('data', chunk => {
+    req.on('data', (chunk) => {
       data += chunk;
     });
     req.on('end', () => {
       resolve(data);
     });
   });
-}
+};
+
+// Verify Discord signature
+const verifySignature = (req, body) => {
+  try {
+    const signature = req.headers['x-signature-ed25519'];
+    const timestamp = req.headers['x-signature-timestamp'];
+    const publicKey = process.env.DISCORD_PUBLIC_KEY;
+
+    if (!signature || !timestamp || !publicKey) {
+      return false;
+    }
+
+    const message = timestamp + body;
+    return crypto.verify(
+      null,
+      Buffer.from(message),
+      Buffer.from(publicKey, 'hex'),
+      Buffer.from(signature, 'hex')
+    );
+  } catch {
+    return false;
+  }
+};
 
 export default async function handler(req, res) {
-  console.log('=== DEBUG VERSION ===');
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('Headers:', {
-    'x-signature-ed25519': req.headers['x-signature-ed25519'] ? 'PRESENT' : 'MISSING',
-    'x-signature-timestamp': req.headers['x-signature-timestamp'] ? 'PRESENT' : 'MISSING',
-    'content-type': req.headers['content-type'],
-    'user-agent': req.headers['user-agent']
-  });
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST');
+    res.setHeader('Access-Control-Allow-Headers', 'X-Signature-Ed25519, X-Signature-Timestamp, Content-Type');
+    return res.status(200).end();
+  }
 
+  // Only allow POST
   if (req.method !== 'POST') {
-    console.log('Non-POST request - this is from browser');
-    return res.json({ ok: true, message: 'This endpoint expects POST requests from Discord' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Check if this is a Discord request
-  const hasDiscordHeaders = req.headers['x-signature-ed25519'] && req.headers['x-signature-timestamp'];
-  
-  if (!hasDiscordHeaders) {
-    console.log('POST request but missing Discord headers');
-    return res.status(401).json({ error: 'Missing Discord signature headers' });
-  }
-
-  console.log('✅ This looks like a Discord request!');
-  
   try {
-    const rawBody = await parseRawBody(req);
-    console.log('Raw body length:', rawBody.length);
-    console.log('Raw body content:', rawBody);
+    // Get raw body
+    const rawBody = await getRawBody(req);
+    
+    // Verify signature
+    if (!verifySignature(req, rawBody)) {
+      console.log('Signature verification failed');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
 
+    // Parse the interaction
     const interaction = JSON.parse(rawBody);
-    console.log('Parsed interaction type:', interaction?.type);
-
-    // Handle PING from Discord
+    
+    // Handle PING (this is what Discord sends for verification)
     if (interaction.type === 1) {
-      console.log('🎯 DISCORD PING RECEIVED - RETURNING PONG');
+      console.log('Received and responding to PING');
       return res.json({ type: 1 });
     }
 
-    console.log('Unknown interaction type:', interaction.type);
-    res.status(400).json({ error: 'Unknown interaction type' });
+    // If we get here, it's a different interaction type
+    console.log('Received non-PING interaction:', interaction.type);
+    res.status(400).json({ error: 'Unhandled interaction type' });
 
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error('Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
