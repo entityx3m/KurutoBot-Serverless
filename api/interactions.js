@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   const timestamp = req.headers['x-signature-timestamp'];
   const body = await req.text();
 
-  const isValid = verifyKey(body, signature, timestamp, process.env.PUBLIC_KEY);
+  const isValid = verifyKey(body, signature, timestamp, process.env.DISCORD_PUBLIC_KEY);
   if (!isValid) {
     return res.status(401).send('Bad request signature');
   }
