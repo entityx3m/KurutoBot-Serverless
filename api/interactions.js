@@ -32,54 +32,79 @@ const CLAN_MAP = {
 
 // Verify Discord request
 function verifySignature(req) {
-  const signature = req.headers['x-signature-ed25519'];
-  const timestamp = req.headers['x-signature-timestamp'];
-  const rawBody = JSON.stringify(req.body);
-  
-  if (!signature || !timestamp) {
-    return false;
-  }
-  
-  const publicKey = process.env.DISCORD_PUBLIC_KEY;
-  const message = timestamp + rawBody;
-  
   try {
-    return crypto.verify(
+    const signature = req.headers['x-signature-ed25519'];
+    const timestamp = req.headers['x-signature-timestamp'];
+    
+    if (!signature || !timestamp) {
+      console.log('Missing signature headers');
+      return false;
+    }
+
+    // Get the raw body from the request
+    const rawBody = JSON.stringify(req.body);
+    
+    const publicKey = process.env.DISCORD_PUBLIC_KEY;
+    if (!publicKey) {
+      console.log('Missing DISCORD_PUBLIC_KEY');
+      return false;
+    }
+
+    const message = timestamp + rawBody;
+    
+    const isVerified = crypto.verify(
       null,
       Buffer.from(message, 'utf8'),
       Buffer.from(publicKey, 'hex'),
       Buffer.from(signature, 'hex')
     );
-  } catch {
+
+    console.log('Signature verification result:', isVerified);
+    return isVerified;
+    
+  } catch (error) {
+    console.error('Error verifying signature:', error);
     return false;
   }
 }
 
 export default async function handler(req, res) {
-  // Log the request for debugging
-  console.log('Received request:', req.method, req.url);
-  
-  // Verify Discord signature
-  if (!verifySignature(req)) {
-    console.log('Invalid signature');
-    return res.status(401).end('Invalid signature');
+  console.log('=== Request Received ===');
+  console.log('Method:', req.method);
+  console.log('Headers:', {
+    'x-signature-ed25519': req.headers['x-signature-ed25519'] ? 'present' : 'missing',
+    'x-signature-timestamp': req.headers['x-signature-timestamp'] ? 'present' : 'missing'
+  });
+
+  // Handle preflight OPTIONS request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
-  
+
   if (req.method !== 'POST') {
+    console.log('Method not allowed');
     return res.status(405).end('Method Not Allowed');
   }
+
+  // Verify Discord signature
+  if (!verifySignature(req)) {
+    console.log('Invalid signature - returning 401');
+    return res.status(401).end('Invalid signature');
+  }
+
+  console.log('Signature valid, processing interaction...');
   
   const interaction = req.body;
-  console.log('Interaction type:', interaction.type);
+  console.log('Interaction type:', interaction?.type);
 
   // Handle PING from Discord
   if (interaction.type === 1) {
-    console.log('Handling PING');
+    console.log('Handling PING request');
     return res.json({ type: 1 });
   }
 
   // Handle slash command
-  if (interaction.type === 2 && interaction.data.name === 'add') {
+  if (interaction.type === 2 && interaction.data?.name === 'add') {
     console.log('Handling add command');
     return await handleAddCommand(interaction, res);
   }
@@ -88,6 +113,7 @@ export default async function handler(req, res) {
   res.status(400).json({ error: 'Unknown interaction type' });
 }
 
+// REST OF YOUR CODE REMAINS THE SAME (handleAddCommand, addRoles, etc.)
 async function handleAddCommand(interaction, res) {
   try {
     // Defer the response immediately
