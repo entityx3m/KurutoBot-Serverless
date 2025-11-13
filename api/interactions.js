@@ -85,42 +85,31 @@ function verifySignature(req, rawBody) {
 export default async function handler(req, res) {
   console.log('=== Request Received ===');
   console.log('Method:', req.method);
-  console.log('URL:', req.url);
 
   if (req.method !== 'POST') {
-    console.log('Method not allowed, returning 200 for OPTIONS/preflight');
-    return res.status(200).json({ ok: true }); // Return 200 for non-POST during verification
+    return res.status(405).end('Method Not Allowed');
   }
 
   try {
     // Get raw body
     const rawBody = await parseRawBody(req);
-    console.log('Raw body received, length:', rawBody.length);
-    console.log('Raw body content:', rawBody);
+    console.log('Raw body length:', rawBody.length);
 
-    // Parse the body to check interaction type
-    let interaction;
-    try {
-      interaction = JSON.parse(rawBody);
-      console.log('Interaction type:', interaction?.type);
-    } catch (parseError) {
-      console.log('Failed to parse JSON, returning 200 for verification');
-      return res.status(200).json({ ok: true });
+    // Verify signature first
+    const signatureValid = verifySignature(req, rawBody);
+    if (!signatureValid) {
+      console.log('Invalid signature');
+      return res.status(401).end('Invalid signature');
     }
 
-    // Handle PING from Discord (this is what Discord sends for verification)
+    // Parse body only after verification
+    const interaction = JSON.parse(rawBody);
+    console.log('Interaction type:', interaction?.type);
+
+    // Handle PING from Discord (VERIFICATION)
     if (interaction.type === 1) {
       console.log('Handling PING request - returning PONG');
-      return res.json({ type: 1 });
-    }
-
-    // For other requests, verify signature
-    const signatureValid = verifySignature(req, rawBody);
-    console.log('Signature valid for non-PING:', signatureValid);
-
-    if (!signatureValid && interaction.type !== 1) {
-      console.log('Invalid signature for non-PING request');
-      return res.status(401).end('Invalid signature');
+      return res.json({ type: 1 }); // This is crucial for verification!
     }
 
     // Handle slash command
@@ -129,17 +118,16 @@ export default async function handler(req, res) {
       return await handleAddCommand(interaction, res);
     }
 
-    console.log('Unknown interaction type, returning 200');
-    res.status(200).json({ ok: true });
+    console.log('Unknown interaction type');
+    res.status(400).json({ error: 'Unknown interaction type' });
 
   } catch (error) {
     console.error('Unexpected error:', error);
-    // Always return 200 during verification to see if it passes
-    res.status(200).json({ ok: true, error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
 
-// REST OF YOUR CODE (handleAddCommand, addRoles, etc.) REMAINS EXACTLY THE SAME
+// REST OF YOUR CODE REMAINS EXACTLY THE SAME...
 async function handleAddCommand(interaction, res) {
   try {
     // Defer the response immediately
