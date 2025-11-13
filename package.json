@@ -1,7 +1,17 @@
 {
-  "name": "discord-bot",
+  "name": "boom-house-bot",
   "version": "1.0.0",
   "type": "module",
+  "description": "Boom House Discord Bot for Vercel",
+  "main": "api/interactions.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1"
+  },
   "engines": {
     "node": "22.x"
   }
