@@ -30,8 +30,25 @@ const CLAN_MAP = {
   WT: { role: IDS.ROLES.WT, channel: IDS.CHANNELS.WT, name: 'Winter' }
 };
 
-// Verify Discord request
-function verifySignature(req) {
+export const config = {
+  api: {
+    bodyParser: false, // This is crucial - prevents Vercel from parsing the body
+  },
+};
+
+async function parseRawBody(req) {
+  return new Promise((resolve) => {
+    let data = '';
+    req.on('data', chunk => {
+      data += chunk;
+    });
+    req.on('end', () => {
+      resolve(data);
+    });
+  });
+}
+
+function verifySignature(req, rawBody) {
   try {
     const signature = req.headers['x-signature-ed25519'];
     const timestamp = req.headers['x-signature-timestamp'];
@@ -41,9 +58,6 @@ function verifySignature(req) {
       return false;
     }
 
-    // Get the raw body from the request
-    const rawBody = JSON.stringify(req.body);
-    
     const publicKey = process.env.DISCORD_PUBLIC_KEY;
     if (!publicKey) {
       console.log('Missing DISCORD_PUBLIC_KEY');
@@ -71,30 +85,26 @@ function verifySignature(req) {
 export default async function handler(req, res) {
   console.log('=== Request Received ===');
   console.log('Method:', req.method);
-  console.log('Headers:', {
-    'x-signature-ed25519': req.headers['x-signature-ed25519'] ? 'present' : 'missing',
-    'x-signature-timestamp': req.headers['x-signature-timestamp'] ? 'present' : 'missing'
-  });
-
-  // Handle preflight OPTIONS request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
 
   if (req.method !== 'POST') {
     console.log('Method not allowed');
     return res.status(405).end('Method Not Allowed');
   }
 
-  // Verify Discord signature
-  if (!verifySignature(req)) {
+  // Get raw body
+  const rawBody = await parseRawBody(req);
+  console.log('Raw body length:', rawBody.length);
+
+  // Verify Discord signature with raw body
+  if (!verifySignature(req, rawBody)) {
     console.log('Invalid signature - returning 401');
     return res.status(401).end('Invalid signature');
   }
 
   console.log('Signature valid, processing interaction...');
   
-  const interaction = req.body;
+  // Parse body only after verification
+  const interaction = JSON.parse(rawBody);
   console.log('Interaction type:', interaction?.type);
 
   // Handle PING from Discord
