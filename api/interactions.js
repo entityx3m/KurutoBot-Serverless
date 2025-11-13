@@ -17,38 +17,50 @@ async function parseRawBody(req) {
 }
 
 export default async function handler(req, res) {
-  console.log('=== MINIMAL VERSION - Request Received ===');
+  console.log('=== DEBUG VERSION ===');
   console.log('Method:', req.method);
+  console.log('URL:', req.url);
   console.log('Headers:', {
-    'x-signature-ed25519': req.headers['x-signature-ed25519'] ? 'present' : 'missing',
-    'x-signature-timestamp': req.headers['x-signature-timestamp'] ? 'present' : 'missing'
+    'x-signature-ed25519': req.headers['x-signature-ed25519'] ? 'PRESENT' : 'MISSING',
+    'x-signature-timestamp': req.headers['x-signature-timestamp'] ? 'PRESENT' : 'MISSING',
+    'content-type': req.headers['content-type'],
+    'user-agent': req.headers['user-agent']
   });
 
   if (req.method !== 'POST') {
-    console.log('Method not allowed');
-    return res.status(405).end('Method Not Allowed');
+    console.log('Non-POST request - this is from browser');
+    return res.json({ ok: true, message: 'This endpoint expects POST requests from Discord' });
   }
 
+  // Check if this is a Discord request
+  const hasDiscordHeaders = req.headers['x-signature-ed25519'] && req.headers['x-signature-timestamp'];
+  
+  if (!hasDiscordHeaders) {
+    console.log('POST request but missing Discord headers');
+    return res.status(401).json({ error: 'Missing Discord signature headers' });
+  }
+
+  console.log('✅ This looks like a Discord request!');
+  
   try {
     const rawBody = await parseRawBody(req);
     console.log('Raw body length:', rawBody.length);
-    console.log('Raw body (first 200 chars):', rawBody.substring(0, 200));
+    console.log('Raw body content:', rawBody);
 
     const interaction = JSON.parse(rawBody);
-    console.log('Interaction type:', interaction?.type);
+    console.log('Parsed interaction type:', interaction?.type);
 
-    // THIS IS THE KEY: Handle PING requests
+    // Handle PING from Discord
     if (interaction.type === 1) {
-      console.log('✅ Handling PING - returning PONG');
+      console.log('🎯 DISCORD PING RECEIVED - RETURNING PONG');
       return res.json({ type: 1 });
     }
 
-    console.log('Not a PING request, returning 400');
-    res.status(400).json({ error: 'Not a PING request' });
+    console.log('Unknown interaction type:', interaction.type);
+    res.status(400).json({ error: 'Unknown interaction type' });
 
   } catch (error) {
-    console.error('Error:', error);
-    // Still return 200 for verification
-    res.status(200).json({ ok: true, error: error.message });
+    console.error('Error processing request:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
