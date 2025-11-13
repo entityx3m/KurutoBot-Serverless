@@ -5,11 +5,6 @@ const TOKEN = process.env.BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
-if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
-  console.error('Missing environment variables. Please set BOT_TOKEN, CLIENT_ID and GUILD_ID.');
-  process.exit(1);
-}
-
 // Role & Channel IDs
 const IDS = {
   ROLES: {
@@ -40,12 +35,33 @@ const CLAN_MAP = {
   WT: { role: IDS.ROLES.WT, channel: IDS.CHANNELS.WT, name: 'Winter' }
 };
 
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages],
-  partials: [Partials.Channel]
-});
-
+// Initialize bot only if token exists
+let client = null;
 let isBotReady = false;
+
+function initializeBot() {
+  if (!TOKEN) {
+    console.error('BOT_TOKEN not found in environment variables');
+    return null;
+  }
+
+  client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages],
+    partials: [Partials.Channel]
+  });
+
+  client.once('ready', async () => {
+    console.log(`Logged in as ${client.user.tag}`);
+    isBotReady = true;
+    await registerCommands();
+  });
+
+  client.on('interactionCreate', handleInteraction);
+  client.on('guildMemberAdd', handleNewMember);
+
+  client.login(TOKEN).catch(console.error);
+  return client;
+}
 
 // Register slash command to guild on startup
 async function registerCommands() {
@@ -80,13 +96,7 @@ async function registerCommands() {
   }
 }
 
-client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}`);
-  isBotReady = true;
-  await registerCommands();
-});
-
-client.on('interactionCreate', async (interaction) => {
+async function handleInteraction(interaction) {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== 'add') return;
 
@@ -104,10 +114,6 @@ client.on('interactionCreate', async (interaction) => {
 
   // Correct handling of default pingclan value
   const shouldPingClan = (typeof pingClan === 'boolean') ? pingClan : true;
-
-  // Debug logs
-  console.log('pingclan option:', pingClan);
-  console.log('Determined shouldPingClan:', shouldPingClan);
 
   const guild = interaction.guild;
   if (!guild) return interaction.editReply({ content: 'This command must be used in the server.' });
@@ -174,10 +180,9 @@ client.on('interactionCreate', async (interaction) => {
                ? `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}> and pinged their clan members.`
                : `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}> without pinging the clan members.`)
   });
-});
+}
 
-// Welcome new members
-client.on('guildMemberAdd', async (member) => {
+async function handleNewMember(member) {
   const generalChannelId = '1385265097026310229';
   const ticketChannelId = 'REDACTED_CHANNEL_VERIFICATION_ID';
 
@@ -193,10 +198,10 @@ client.on('guildMemberAdd', async (member) => {
   } catch (err) {
     console.error('Failed to send welcome message:', err);
   }
-});
+}
 
-// Login to Discord
-client.login(TOKEN).catch(console.error);
+// Initialize bot
+initializeBot();
 
 // Vercel serverless function handler
 export default async function handler(req, res) {
@@ -205,7 +210,8 @@ export default async function handler(req, res) {
     res.status(200).json({ 
       status: 'Bot is running', 
       ready: isBotReady,
-      user: client.user?.tag || 'Not logged in'
+      user: client?.user?.tag || 'Not logged in',
+      timestamp: new Date().toISOString()
     });
     return;
   }
