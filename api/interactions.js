@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import crypto from 'crypto';
 
 // Your existing IDs
 const IDS = {
@@ -30,29 +30,69 @@ const CLAN_MAP = {
   WT: { role: IDS.ROLES.WT, channel: IDS.CHANNELS.WT, name: 'Winter' }
 };
 
+// Verify Discord request
+function verifySignature(req) {
+  const signature = req.headers['x-signature-ed25519'];
+  const timestamp = req.headers['x-signature-timestamp'];
+  const rawBody = JSON.stringify(req.body);
+  
+  if (!signature || !timestamp) {
+    return false;
+  }
+  
+  const publicKey = process.env.DISCORD_PUBLIC_KEY;
+  const message = timestamp + rawBody;
+  
+  try {
+    return crypto.verify(
+      null,
+      Buffer.from(message, 'utf8'),
+      Buffer.from(publicKey, 'hex'),
+      Buffer.from(signature, 'hex')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  // Log the request for debugging
+  console.log('Received request:', req.method, req.url);
+  
+  // Verify Discord signature
+  if (!verifySignature(req)) {
+    console.log('Invalid signature');
+    return res.status(401).end('Invalid signature');
+  }
+  
+  if (req.method !== 'POST') {
+    return res.status(405).end('Method Not Allowed');
+  }
   
   const interaction = req.body;
+  console.log('Interaction type:', interaction.type);
 
   // Handle PING from Discord
   if (interaction.type === 1) {
+    console.log('Handling PING');
     return res.json({ type: 1 });
   }
 
   // Handle slash command
   if (interaction.type === 2 && interaction.data.name === 'add') {
+    console.log('Handling add command');
     return await handleAddCommand(interaction, res);
   }
 
+  console.log('Unknown interaction type');
   res.status(400).json({ error: 'Unknown interaction type' });
 }
 
 async function handleAddCommand(interaction, res) {
-  // Defer the response immediately
-  res.json({ type: 5 }); // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
-  
   try {
+    // Defer the response immediately
+    res.json({ type: 5 }); // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+    
     const options = interaction.data.options || [];
     const memberOption = options.find(opt => opt.name === 'member');
     const clanOption = options.find(opt => opt.name === 'clan');
@@ -70,6 +110,8 @@ async function handleAddCommand(interaction, res) {
     if (!clanInfo) {
       return await editOriginalResponse(interaction, 'Invalid clan provided.');
     }
+
+    console.log(`Adding ${userId} to clan ${clan}`);
 
     // Add roles using Discord API
     await addRoles(userId, clanInfo.role);
@@ -153,7 +195,8 @@ async function discordApi(endpoint, method = 'GET', body = null) {
   });
 
   if (!response.ok) {
-    throw new Error(`Discord API error: ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`Discord API error: ${response.status} - ${errorText}`);
   }
 
   return response.json();
