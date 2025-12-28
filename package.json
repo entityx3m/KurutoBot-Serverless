@@ -1,9 +1,0 @@
-{
-  "name": "boomhouse-bot",
-  "version": "1.0.0",
-  "main": "api/interactions.js",
-  "type": "module",
-  "dependencies": {
-    "discord-interactions": "^4.0.1"
-  }
-}
