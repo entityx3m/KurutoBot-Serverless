@@ -293,31 +293,6 @@ export default {
         throw new Error(`Failed to assign clan role: ${clanRoleResponse.statusText}`);
       }
 
-      // Update recruitment tracker in Redis (UPDATED: Changed message)
-      let recruitmentStatus = '';
-      try {
-        const incrementSuccess = await RecruitmentTracker.incrementCurrent(clan);
-        
-        if (incrementSuccess) {
-          const clanData = await RecruitmentTracker.getClan(clan);
-          if (clanData) {
-            const { current, needed } = clanData;
-            const remaining = Math.max(0, needed - current);
-            
-            if (needed > 0) {
-              const progress = Math.min(Math.round((current / needed) * 100), 100);
-              const progressBar = RecruitmentTracker.createProgressBar(progress);
-              recruitmentStatus = `\n📊 **Recruitment Progress:** ${current}/${needed} (${remaining} left)\n${progressBar} ${progress}%`;
-            } else {
-              recruitmentStatus = `\n📊 **Recruitment:** Goal not set yet. Use \`/postrecruit\` to auto-set goals`;
-            }
-          }
-        }
-      } catch (trackerError) {
-        console.warn('⚠️ Failed to update recruitment tracker:', trackerError);
-        recruitmentStatus = `\n⚠️ **Note:** Could not update recruitment counter`;
-      }
-
       // Send DM (non-blocking)
       try {
         const dmChannelResponse = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
@@ -400,10 +375,7 @@ export default {
         visitorMessage +
         `<a:AnimatedCheck:1427570005750448169> Assigned **BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
         `<a:AnimatedCheck:1427570005750448169> A welcome DM has been sent. 📩\n` +
-        (shouldPingClan
-          ? `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}> and pinged their clan members.`
-          : `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}> without pinging the clan members.`) +
-        recruitmentStatus;
+        `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`;
 
       return {
         content: resultContent,

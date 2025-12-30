@@ -1,48 +1,46 @@
-// utils/recruitment.ts
+// utils/recruitment.ts (simplified - remove current/needed tracking since we use API)
 import { kv } from '@vercel/kv';
 
 export interface ClanRecruitment {
   clan: string; // WM, LE, ZP, CH
   name: string; // Full clan name
-  needed: number;
-  current: number;
+  memberCount: number; // Current members from API
   lastUpdated: number;
-  clanTag?: string; // NEW: Added clan tag field
+  clanTag?: string; // Clan tag for API calls
 }
 
 export class RecruitmentTracker {
   private static readonly KEY = 'boom_house_recruitment';
-  // NEW: Added CoC API constants
   private static readonly COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
   private static readonly MAX_CLAN_SIZE = 50;
   private static readonly CLAN_TAGS = {
     WM: 'REDACTED_WM_CLAN_TAG',
-    LE: 'REDACTED_LE_CLAN_TAG',
+    LE: 'REDACTED_LE_CLAN_TAG', 
     ZP: 'REDACTED_ZP_CLAN_TAG',
     CH: 'REDACTED_CH_CLAN_TAG'
   };
 
+  // Remove current and needed from initialization
   static async initialize(): Promise<void> {
     try {
       const exists = await kv.exists(this.KEY);
       if (!exists) {
-        // UPDATED: Added clanTag to default clans
         const defaultClans: Record<string, ClanRecruitment> = {
-          WM: { clan: 'WM', name: 'WAR MASTER', needed: 0, current: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_WM_CLAN_TAG' },
-          LE: { clan: 'LE', name: 'LEGENDS', needed: 0, current: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_LE_CLAN_TAG' },
-          ZP: { clan: 'ZP', name: 'ZwartePiet', needed: 0, current: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_ZP_CLAN_TAG' },
-          CH: { clan: 'CH', name: 'Clash Heros', needed: 0, current: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_CH_CLAN_TAG' },
+          WM: { clan: 'WM', name: 'WAR MASTER', memberCount: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_WM_CLAN_TAG' },
+          LE: { clan: 'LE', name: 'LEGENDS', memberCount: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_LE_CLAN_TAG' },
+          ZP: { clan: 'ZP', name: 'ZwartePiet', memberCount: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_ZP_CLAN_TAG' },
+          CH: { clan: 'CH', name: 'Clash Heros', memberCount: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_CH_CLAN_TAG' },
         };
         
         await kv.hset(this.KEY, defaultClans);
-        console.log('✅ Recruitment tracker initialized with default data');
+        console.log('✅ Recruitment tracker initialized');
       }
     } catch (error) {
       console.error('❌ Failed to initialize recruitment tracker:', error);
     }
   }
 
-  // NEW: Method to update recruitment data from CoC API
+  // Fetch real-time member counts from API
   static async updateFromAPI(): Promise<void> {
     try {
       const clans = await this.getAllClans();
@@ -52,7 +50,6 @@ export class RecruitmentTracker {
         
         if (clanTag) {
           try {
-            // Fetch clan data from API
             const encodedTag = encodeURIComponent(clanTag);
             const response = await fetch(`${this.COC_API_BASE_URL}/clans/${encodedTag}`, {
               headers: {
@@ -64,16 +61,13 @@ export class RecruitmentTracker {
             if (response.ok) {
               const clanData = await response.json();
               const memberCount = clanData.members || 0;
-              const needed = Math.max(0, this.MAX_CLAN_SIZE - memberCount);
               
-              // Update the clan data
-              clan.needed = needed;
+              // Update only member count
+              clan.memberCount = memberCount;
               clan.lastUpdated = Date.now();
               
               await kv.hset(this.KEY, { [clan.clan.toUpperCase()]: clan });
-              console.log(`✅ Updated ${clan.name}: ${memberCount}/50 members, need ${needed} recruits`);
-            } else {
-              console.warn(`⚠️ Failed to fetch ${clan.name} data: ${response.status}`);
+              console.log(`✅ Updated ${clan.name}: ${memberCount}/50 members`);
             }
           } catch (error) {
             console.warn(`⚠️ Error fetching ${clan.name} data:`, error);
@@ -85,53 +79,8 @@ export class RecruitmentTracker {
     }
   }
 
-  static async setRecruitment(clan: string, needed: number): Promise<boolean> {
-    try {
-      const clanData = await this.getClan(clan);
-      if (!clanData) return false;
-
-      clanData.needed = needed;
-      clanData.lastUpdated = Date.now();
-      
-      await kv.hset(this.KEY, { [clan.toUpperCase()]: clanData });
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed to set recruitment for ${clan}:`, error);
-      return false;
-    }
-  }
-
-  static async incrementCurrent(clan: string): Promise<boolean> {
-    try {
-      const clanData = await this.getClan(clan);
-      if (!clanData) return false;
-
-      clanData.current += 1;
-      clanData.lastUpdated = Date.now();
-      
-      await kv.hset(this.KEY, { [clan.toUpperCase()]: clanData });
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed to increment current for ${clan}:`, error);
-      return false;
-    }
-  }
-
-  static async resetCurrent(clan: string): Promise<boolean> {
-    try {
-      const clanData = await this.getClan(clan);
-      if (!clanData) return false;
-
-      clanData.current = 0;
-      clanData.lastUpdated = Date.now();
-      
-      await kv.hset(this.KEY, { [clan.toUpperCase()]: clanData });
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed to reset current for ${clan}:`, error);
-      return false;
-    }
-  }
+  // Remove setRecruitment, incrementCurrent, resetCurrent methods
+  // We don't need them anymore since we use API data
 
   static async getClan(clan: string): Promise<ClanRecruitment | null> {
     try {
@@ -153,14 +102,22 @@ export class RecruitmentTracker {
     }
   }
 
-  static async clearAll(): Promise<void> {
-    try {
-      await kv.del(this.KEY);
-      await this.initialize();
-      console.log('✅ Recruitment data cleared and reinitialized');
-    } catch (error) {
-      console.error('❌ Failed to clear recruitment data:', error);
-    }
+  static async getSummary() {
+    const clans = await this.getAllClans();
+    
+    // Calculate totals based on current member counts
+    const totalMembers = clans.reduce((sum, clan) => sum + clan.memberCount, 0);
+    const totalCapacity = clans.length * this.MAX_CLAN_SIZE;
+    const totalEmptySlots = Math.max(0, totalCapacity - totalMembers);
+    const overallFillPercentage = totalCapacity > 0 ? Math.round((totalMembers / totalCapacity) * 100) : 0;
+    
+    return {
+      clans,
+      totalMembers,
+      totalCapacity,
+      totalEmptySlots,
+      overallFillPercentage,
+    };
   }
 
   // Helper to create progress bar for display
@@ -170,20 +127,9 @@ export class RecruitmentTracker {
     return `[${'█'.repeat(filled)}${'░'.repeat(empty)}]`;
   }
 
-  // Get formatted summary
-  static async getSummary() {
-    const clans = await this.getAllClans();
-    const totalNeeded = clans.reduce((sum, clan) => sum + clan.needed, 0);
-    const totalCurrent = clans.reduce((sum, clan) => sum + clan.current, 0);
-    const remaining = totalNeeded - totalCurrent;
-    
-    return {
-      clans,
-      totalNeeded,
-      totalCurrent,
-      remaining,
-      overallProgress: totalNeeded > 0 ? Math.round((totalCurrent / totalNeeded) * 100) : 0,
-    };
+  // Calculate needed recruits for a clan
+  static calculateNeededRecruits(memberCount: number): number {
+    return Math.max(0, this.MAX_CLAN_SIZE - memberCount);
   }
 }
 

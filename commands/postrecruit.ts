@@ -67,36 +67,37 @@ export default {
   },
 };
 
+// commands/postrecruit.ts (updated with better display)
 async function createRecruitmentMessage() {
   const summary = await RecruitmentTracker.getSummary();
-  const { clans, totalNeeded, totalCurrent, remaining, overallProgress } = summary;
+  const { clans, totalMembers, totalCapacity, totalEmptySlots, overallFillPercentage } = summary;
   
-  let description = `**Total Recruitment Status**\n` +
-                   `🎯 **Goal:** ${totalNeeded} recruits\n` +
-                   `📊 **Current Recruits:** ${totalCurrent}\n` +
-                   `📈 **Remaining:** ${remaining} (${overallProgress}%)\n\n` +
+  let description = `**📊 Overall Alliance Status**\n` +
+                   `👥 **Total Members:** ${totalMembers}/${totalCapacity}\n` +
+                   `📈 **Overall Fill Rate:** ${overallFillPercentage}%\n` +
+                   `🎯 **Total Recruits Needed:** ${totalEmptySlots}\n\n` +
                    `**Clan Breakdown:**\n`;
   
   clans.forEach((clan: any) => {
-    const progress = clan.needed > 0 ? Math.min(Math.round((clan.current / clan.needed) * 100), 100) : 0;
-    const progressBar = RecruitmentTracker.createProgressBar(progress);
-    const remainingClan = Math.max(0, clan.needed - clan.current);
+    const neededRecruits = RecruitmentTracker.calculateNeededRecruits(clan.memberCount);
+    const fillPercentage = Math.round((clan.memberCount / 50) * 100);
+    const progressBar = RecruitmentTracker.createProgressBar(fillPercentage);
     
     description += `\n**${clan.name} (${clan.clan})**\n` +
-                  `> 🎯 **Need:** ${clan.needed} recruits\n` +
-                  `> 📊 **Recruited:** ${clan.current}\n` +
-                  `> 📈 **Remaining:** ${remainingClan}\n` +
-                  `> ${progressBar} ${progress}%\n`;
+                  `> 👥 **Members:** ${clan.memberCount}/50\n` +
+                  `> 🎯 **Recruits Needed:** ${neededRecruits}\n` +
+                  `> 📊 **Fill Rate:** ${fillPercentage}%\n` +
+                  `> ${progressBar}\n`;
   });
   
-  description += `\n*Goals automatically calculated to fill clans to 50 members*`;
+  description += `\n*Data automatically fetched from Clash of Clans API*\n*Click refresh to update*`;
   
   const embed = {
-    title: "📋 BOOM House Recruitment Status",
+    title: "🏰 BOOM House Recruitment Status",
     description: description,
     color: 0x5865F2,
     footer: {
-      text: "Click refresh below to update • Last updated"
+      text: "Last updated"
     },
     timestamp: new Date().toISOString()
   };
