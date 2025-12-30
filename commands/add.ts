@@ -13,6 +13,7 @@ import { RecruitmentTracker } from "../utils/recruitment";
 
 // Guild ID check constant
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
+const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1"; // NEW: Added CoC API URL
 
 // Role & Channel IDs
 const IDS = {
@@ -38,11 +39,12 @@ const IDS = {
   }
 };
 
+// UPDATED: Added abbr and tag fields
 const CLAN_MAP = {
-  WM: { role: IDS.ROLES.WM, channel: IDS.CHANNELS.WM, name: 'WAR MASTER' },
-  LE: { role: IDS.ROLES.LE, channel: IDS.CHANNELS.LE, name: 'LEGENDS' },
-  ZP: { role: IDS.ROLES.ZP, channel: IDS.CHANNELS.ZP, name: 'ZwartePiet' },
-  CH: { role: IDS.ROLES.CH, channel: IDS.CHANNELS.CH, name: 'Clash Heros' }
+  WM: { role: IDS.ROLES.WM, channel: IDS.CHANNELS.WM, name: 'WAR MASTER', abbr: 'WM', tag: 'REDACTED_WM_CLAN_TAG' },
+  LE: { role: IDS.ROLES.LE, channel: IDS.CHANNELS.LE, name: 'LEGENDS', abbr: 'LE', tag: 'REDACTED_LE_CLAN_TAG' },
+  ZP: { role: IDS.ROLES.ZP, channel: IDS.CHANNELS.ZP, name: 'ZwartePiet', abbr: 'ZP', tag: 'REDACTED_ZP_CLAN_TAG' },
+  CH: { role: IDS.ROLES.CH, channel: IDS.CHANNELS.CH, name: 'Clash Heros', abbr: 'CH', tag: 'REDACTED_CH_CLAN_TAG' }
 };
 
 export default {
@@ -69,6 +71,13 @@ export default {
           { name: "ZP (ZwartePiet)", value: "ZP" },
           { name: "CH (Clash Heros)", value: "CH" }
         ]
+      },
+      // NEW: Added player_tag parameter
+      {
+        name: "player_tag",
+        description: "Player's Clash of Clans tag (e.g., #ABC123)",
+        type: ApplicationCommandOptionType.String,
+        required: true,
       },
       {
         name: "pingclan",
@@ -101,12 +110,15 @@ export default {
 
     const chatInteraction = interaction;
 
-    // Find options
+    // Find options (UPDATED: Added player_tag option)
     const memberOption = chatInteraction.data.options?.find(
       (option) => option.name === "member"
     ) as any;
     const clanOption = chatInteraction.data.options?.find(
       (option) => option.name === "clan"
+    ) as any;
+    const playerTagOption = chatInteraction.data.options?.find(
+      (option) => option.name === "player_tag"
     ) as any;
     const pingClanOption = chatInteraction.data.options?.find(
       (option) => option.name === "pingclan"
@@ -114,10 +126,19 @@ export default {
 
     const memberId = memberOption?.value;
     const clan = clanOption?.value;
+    const rawPlayerTag = playerTagOption?.value;
     const pingClan = pingClanOption?.value;
 
+    // NEW: Validate player tag
+    let playerTag = rawPlayerTag?.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!playerTag || !/^[A-Z0-9]{3,15}$/.test(playerTag)) {
+      return {
+        content: "❌ **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+        flags: MessageFlags.Ephemeral,
+      };
+    }
+
     // Get member from resolved data
-    const memberData = chatInteraction.data.resolved?.members?.[memberId];
     const memberUser = chatInteraction.data.resolved?.users?.[memberId];
     
     if (!memberUser) {
@@ -135,31 +156,83 @@ export default {
       };
     }
 
-    // Get display name (server nickname -> global name -> username)
-    const displayName = memberData?.nick || memberUser.global_name || memberUser.username;
-
     // Correct handling of default pingclan value
     const shouldPingClan = (typeof pingClan === 'boolean') ? pingClan : true;
 
     try {
+      // NEW: Verify player tag with CoC API
+      const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
+        headers: { 
+          'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
+          'Accept': 'application/json' 
+        },
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            content: `❌ **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
+            flags: MessageFlags.Ephemeral,
+          };
+        }
+        throw new Error(`CoC API error: ${response.status}`);
+      }
+      
+      const playerData = await response.json();
+      const playerName = playerData.name;
+      const thLevel = playerData.townHallLevel;
+      
+      // NEW: Check if player is in the correct clan
+      if (playerData.clan) {
+        const expectedClanTag = clanInfo.tag.replace('#', '');
+        const actualClanTag = playerData.clan.tag.replace('#', '');
+        
+        if (actualClanTag !== expectedClanTag) {
+          return {
+            content: `⚠️ **Clan Mismatch**\nPlayer ${playerName} is in clan **${playerData.clan.name}**, not **${clanInfo.name}**.\n\n*To proceed anyway, run the command again.*`,
+            flags: MessageFlags.Ephemeral,
+          };
+        }
+      }
+
       const guildId = interaction.guild_id;
-      const auditReason = `Accepted into ${clanInfo.name} by ${interaction.member?.user?.username || 'unknown'}`;
+      const commanderName = interaction.member?.user?.username || "Staff";
+      const auditReason = `Accepted into ${clanInfo.name} by ${commanderName}`;
+
+      // NEW: Set nickname format: "PlayerName | CLAN"
+      const nickname = `${playerName} | ${clanInfo.abbr}`;
+      
+      try {
+        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+            'Content-Type': 'application/json',
+            'X-Audit-Log-Reason': auditReason
+          },
+          body: JSON.stringify({ nick: nickname }),
+        });
+        console.log(`✅ Set nickname for ${memberId} to "${nickname}"`);
+      } catch (nicknameError) {
+        console.warn(`⚠️ Could not set nickname for ${memberId}:`, nicknameError);
+        // Continue even if nickname fails
+      }
 
       let visitorStatus = 'not_present'; // 'removed', 'not_present', or 'error'
 
       // First, check if user actually has the Visitor role
       try {
         // Fetch the member to see their current roles
-        const memberResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}`, {
+        const fetchMemberResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
           },
         });
 
-        if (memberResponse.ok) {
-          const memberInfo = await memberResponse.json();
-          const hasVisitorRole = memberInfo.roles?.includes(IDS.ROLES.VISITOR);
+        if (fetchMemberResponse.ok) {
+          const fetchedMember = await fetchMemberResponse.json();
+          const hasVisitorRole = fetchedMember.roles?.includes(IDS.ROLES.VISITOR);
           
           if (hasVisitorRole) {
             // User has the role, so remove it
@@ -173,23 +246,23 @@ export default {
 
             if (removeResponse.ok) {
               visitorStatus = 'removed';
-              console.log(`✅ Removed Visitor role from ${displayName}`);
+              console.log(`✅ Removed Visitor role from ${memberUser.username}`);
             } else {
               visitorStatus = 'error';
-              console.warn(`⚠️ Failed to remove Visitor role from ${displayName}: ${removeResponse.statusText}`);
+              console.warn(`⚠️ Failed to remove Visitor role from ${memberUser.username}: ${removeResponse.statusText}`);
             }
           } else {
             // User doesn't have the role
             visitorStatus = 'not_present';
-            console.log(`ℹ️ Visitor role not present on ${displayName}`);
+            console.log(`ℹ️ Visitor role not present on ${memberUser.username}`);
           }
         } else {
           visitorStatus = 'error';
-          console.warn(`⚠️ Could not fetch member info for ${displayName}: ${memberResponse.statusText}`);
+          console.warn(`⚠️ Could not fetch member info for ${memberUser.username}: ${fetchMemberResponse.statusText}`);
         }
       } catch (visitorError) {
         visitorStatus = 'error';
-        console.warn(`⚠️ Error processing Visitor role for ${displayName}:`, visitorError);
+        console.warn(`⚠️ Error processing Visitor role for ${memberUser.username}:`, visitorError);
       }
 
       // Assign BOOM Member role
@@ -220,7 +293,7 @@ export default {
         throw new Error(`Failed to assign clan role: ${clanRoleResponse.statusText}`);
       }
 
-      // Update recruitment tracker in Redis
+      // Update recruitment tracker in Redis (UPDATED: Changed message)
       let recruitmentStatus = '';
       try {
         const incrementSuccess = await RecruitmentTracker.incrementCurrent(clan);
@@ -236,7 +309,7 @@ export default {
               const progressBar = RecruitmentTracker.createProgressBar(progress);
               recruitmentStatus = `\n📊 **Recruitment Progress:** ${current}/${needed} (${remaining} left)\n${progressBar} ${progress}%`;
             } else {
-              recruitmentStatus = `\n📊 **Recruitment:** Goal not set yet. Use \`/setrecruit ${clan} <number>\``;
+              recruitmentStatus = `\n📊 **Recruitment:** Goal not set yet. Use \`/postrecruit\` to auto-set goals`;
             }
           }
         }
@@ -311,7 +384,7 @@ export default {
         console.error('Failed to send clan channel welcome:', channelError);
       }
 
-      // Return the final response with display name
+      // UPDATED: Return response with player info
       let visitorMessage = '';
       if (visitorStatus === 'removed') {
         visitorMessage = `<a:AnimatedCheck:1427570005750448169> Removed **Visitor** role.\n`;
@@ -321,7 +394,9 @@ export default {
         visitorMessage = `<a:redcross:1439044567415521443> Could not check/remove **Visitor** role.\n`;
       }
 
-      const resultContent = `<a:AnimatedCheck:1427570005750448169> **${displayName}** has been accepted into **${clanInfo.name}** by <@${interaction.member?.user?.id}>.\n` +
+      const resultContent = `<a:AnimatedCheck:1427570005750448169> **${memberUser.username}** has been accepted into **${clanInfo.name}** by <@${interaction.member?.user?.id}>.\n` +
+        `<a:AnimatedCheck:1427570005750448169> **Player:** ${playerName} (#${playerTag}) | TH${thLevel}\n` +
+        `<a:AnimatedCheck:1427570005750448169> **Nickname set to:** ${nickname}\n` +
         visitorMessage +
         `<a:AnimatedCheck:1427570005750448169> Assigned **BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
         `<a:AnimatedCheck:1427570005750448169> A welcome DM has been sent. 📩\n` +
@@ -338,7 +413,7 @@ export default {
       console.error('Error in add command:', error);
       
       return {
-        content: `Failed to process the command: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `❌ **Recruitment Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
         flags: MessageFlags.Ephemeral,
       };
     }

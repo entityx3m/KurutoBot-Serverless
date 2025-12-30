@@ -1,4 +1,4 @@
-// commands/postrecruit.ts
+// commands/postrecruit.ts (simplified)
 import {
   ApplicationCommandType,
   MessageFlags,
@@ -34,6 +34,9 @@ export default {
     }
     
     try {
+      // Auto-update from CoC API before posting
+      await RecruitmentTracker.updateFromAPI();
+      
       const { embed, components } = await createRecruitmentMessage();
       
       // Post in the current channel
@@ -50,7 +53,7 @@ export default {
       });
       
       return {
-        content: "✅ Recruitment status posted with refresh button!",
+        content: "✅ Recruitment status posted with refresh button! (Auto-fetched from CoC API)",
         flags: MessageFlags.Ephemeral,
       };
       
@@ -70,7 +73,7 @@ async function createRecruitmentMessage() {
   
   let description = `**Total Recruitment Status**\n` +
                    `🎯 **Goal:** ${totalNeeded} recruits\n` +
-                   `📊 **Current:** ${totalCurrent} recruits\n` +
+                   `📊 **Current Recruits:** ${totalCurrent}\n` +
                    `📈 **Remaining:** ${remaining} (${overallProgress}%)\n\n` +
                    `**Clan Breakdown:**\n`;
   
@@ -80,11 +83,13 @@ async function createRecruitmentMessage() {
     const remainingClan = Math.max(0, clan.needed - clan.current);
     
     description += `\n**${clan.name} (${clan.clan})**\n` +
-                  `> 🎯 Goal: ${clan.needed}\n` +
-                  `> 📊 Current: ${clan.current}\n` +
-                  `> 📈 Remaining: ${remainingClan}\n` +
+                  `> 🎯 **Need:** ${clan.needed} recruits\n` +
+                  `> 📊 **Recruited:** ${clan.current}\n` +
+                  `> 📈 **Remaining:** ${remainingClan}\n` +
                   `> ${progressBar} ${progress}%\n`;
   });
+  
+  description += `\n*Goals automatically calculated to fill clans to 50 members*`;
   
   const embed = {
     title: "📋 BOOM House Recruitment Status",

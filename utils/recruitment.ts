@@ -7,20 +7,31 @@ export interface ClanRecruitment {
   needed: number;
   current: number;
   lastUpdated: number;
+  clanTag?: string; // NEW: Added clan tag field
 }
 
 export class RecruitmentTracker {
   private static readonly KEY = 'boom_house_recruitment';
+  // NEW: Added CoC API constants
+  private static readonly COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
+  private static readonly MAX_CLAN_SIZE = 50;
+  private static readonly CLAN_TAGS = {
+    WM: 'REDACTED_WM_CLAN_TAG',
+    LE: 'REDACTED_LE_CLAN_TAG',
+    ZP: 'REDACTED_ZP_CLAN_TAG',
+    CH: 'REDACTED_CH_CLAN_TAG'
+  };
 
   static async initialize(): Promise<void> {
     try {
       const exists = await kv.exists(this.KEY);
       if (!exists) {
+        // UPDATED: Added clanTag to default clans
         const defaultClans: Record<string, ClanRecruitment> = {
-          WM: { clan: 'WM', name: 'WAR MASTER', needed: 0, current: 0, lastUpdated: Date.now() },
-          LE: { clan: 'LE', name: 'LEGENDS', needed: 0, current: 0, lastUpdated: Date.now() },
-          ZP: { clan: 'ZP', name: 'ZwartePiet', needed: 0, current: 0, lastUpdated: Date.now() },
-          CH: { clan: 'CH', name: 'Clash Heros', needed: 0, current: 0, lastUpdated: Date.now() },
+          WM: { clan: 'WM', name: 'WAR MASTER', needed: 0, current: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_WM_CLAN_TAG' },
+          LE: { clan: 'LE', name: 'LEGENDS', needed: 0, current: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_LE_CLAN_TAG' },
+          ZP: { clan: 'ZP', name: 'ZwartePiet', needed: 0, current: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_ZP_CLAN_TAG' },
+          CH: { clan: 'CH', name: 'Clash Heros', needed: 0, current: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_CH_CLAN_TAG' },
         };
         
         await kv.hset(this.KEY, defaultClans);
@@ -28,6 +39,49 @@ export class RecruitmentTracker {
       }
     } catch (error) {
       console.error('❌ Failed to initialize recruitment tracker:', error);
+    }
+  }
+
+  // NEW: Method to update recruitment data from CoC API
+  static async updateFromAPI(): Promise<void> {
+    try {
+      const clans = await this.getAllClans();
+      
+      for (const clan of clans) {
+        const clanTag = clan.clanTag || this.CLAN_TAGS[clan.clan as keyof typeof this.CLAN_TAGS];
+        
+        if (clanTag) {
+          try {
+            // Fetch clan data from API
+            const encodedTag = encodeURIComponent(clanTag);
+            const response = await fetch(`${this.COC_API_BASE_URL}/clans/${encodedTag}`, {
+              headers: {
+                'Authorization': `Bearer ${process.env.COC_API_KEY}`,
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const clanData = await response.json();
+              const memberCount = clanData.members || 0;
+              const needed = Math.max(0, this.MAX_CLAN_SIZE - memberCount);
+              
+              // Update the clan data
+              clan.needed = needed;
+              clan.lastUpdated = Date.now();
+              
+              await kv.hset(this.KEY, { [clan.clan.toUpperCase()]: clan });
+              console.log(`✅ Updated ${clan.name}: ${memberCount}/50 members, need ${needed} recruits`);
+            } else {
+              console.warn(`⚠️ Failed to fetch ${clan.name} data: ${response.status}`);
+            }
+          } catch (error) {
+            console.warn(`⚠️ Error fetching ${clan.name} data:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to update from API:', error);
     }
   }
 
