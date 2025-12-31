@@ -1,4 +1,6 @@
 // utils/recruitment.ts (simplified - remove current/needed tracking since we use API)
+import { configDotenv } from "dotenv";
+configDotenv();
 import { kv } from '@vercel/kv';
 
 export interface ClanRecruitment {
