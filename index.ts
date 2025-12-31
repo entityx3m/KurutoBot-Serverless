@@ -12,6 +12,10 @@ import {
   type SimplifiedInteraction,
 } from "./utils/types";
 import { RecruitmentTracker } from "./utils/recruitment";
+import { getKV, setKV } from "./utils/kvHelper";
+
+const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
+const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
 
 // UPDATED: New embed format using API data
 async function createRecruitmentEmbed() {
@@ -47,6 +51,168 @@ async function createRecruitmentEmbed() {
     },
     timestamp: new Date().toISOString()
   };
+}
+
+// Handle CoC account linking modal submission
+async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelResponse) {
+  try {
+    const userId = message.member?.user?.id;
+    const guildId = message.guild_id;
+    const components = message.data?.components || [];
+    
+    if (!userId || !guildId) {
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+        {
+          type: InteractionResponseType.ChannelMessageWithSource,
+          data: {
+            content: "❌ Failed to identify user or guild",
+            flags: MessageFlags.Ephemeral,
+          },
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      return res.status(200).end();
+    }
+    
+    // Extract player tag from modal
+    let playerTag = '';
+    components.forEach((row: any) => {
+      row.components.forEach((component: any) => {
+        if (component.custom_id === "player_tag_input") {
+          playerTag = component.value || '';
+        }
+      });
+    });
+    
+    // Validate player tag
+    playerTag = playerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!/^[A-Z0-9]{3,15}$/.test(playerTag)) {
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+        {
+          type: InteractionResponseType.ChannelMessageWithSource,
+          data: {
+            content: "❌ **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+            flags: MessageFlags.Ephemeral,
+          },
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      return res.status(200).end();
+    }
+    
+    // Check for existing links
+    const existingLink = await getKV<string>(`linked:${userId}`);
+    if (existingLink) {
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+        {
+          type: InteractionResponseType.ChannelMessageWithSource,
+          data: {
+            content: `❌ **Already Linked**\nYou are already linked to account: **#${existingLink}**\nContact staff if you need to change your linked account.`,
+            flags: MessageFlags.Ephemeral,
+          },
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      return res.status(200).end();
+    }
+    
+    // Verify player tag with CoC API
+    const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
+      headers: { 
+        'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
+        'Accept': 'application/json' 
+      },
+    });
+    
+    if (!response.ok) {
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+        {
+          type: InteractionResponseType.ChannelMessageWithSource,
+          data: {
+            content: `❌ **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
+            flags: MessageFlags.Ephemeral,
+          },
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      return res.status(200).end();
+    }
+    
+    const playerData = await response.json();
+    const playerName = playerData.name;
+    const thLevel = playerData.townHallLevel;
+    
+    // Store in KV
+    await setKV(`linked:${userId}`, playerTag);
+    await setKV(`player:${playerTag}`, {
+      discordId: userId,
+      discordName: message.member?.user?.username,
+      playerTag: playerTag,
+      playerName: playerName,
+      townHallLevel: thLevel,
+      linkedAt: new Date().toISOString(),
+    });
+    
+    // Assign Verified role
+    const auditReason = `CoC account linked via /postlink - ${playerName} (#${playerTag})`;
+    
+    try {
+      await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+          'Content-Type': 'application/json',
+          'X-Audit-Log-Reason': auditReason
+        },
+      });
+    } catch (roleError) {
+      console.warn('Failed to assign Verified role:', roleError);
+    }
+    
+    // Send success response
+    await axios.post(
+      `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+      {
+        type: InteractionResponseType.ChannelMessageWithSource,
+        data: {
+          embeds: [{
+            title: "✅ Account Successfully Linked!",
+            description: `Your Discord account has been linked to your Clash of Clans account.`,
+            color: 0x00ff00,
+            fields: [
+              { name: "👤 CoC Name", value: playerName, inline: true },
+              { name: "🏷️ Player Tag", value: `#${playerTag}`, inline: true },
+              { name: "🏰 Town Hall", value: `Level ${thLevel}`, inline: true },
+            ],
+            footer: { text: "You can now apply to join our clans!" }
+          }],
+          flags: MessageFlags.Ephemeral,
+        },
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    
+    return res.status(200).end();
+    
+  } catch (error) {
+    console.error("Modal handling error:", error);
+    await axios.post(
+      `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+      {
+        type: InteractionResponseType.ChannelMessageWithSource,
+        data: {
+          content: "❌ An error occurred while processing your request.",
+          flags: MessageFlags.Ephemeral,
+        },
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    return res.status(200).end();
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -197,8 +363,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       
+      // Handle link CoC account button (opens modal)
+      if (customId === "link_coc_account") {
+        try {
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+            {
+              type: 9, // InteractionResponseType.Modal
+              data: {
+                custom_id: "link_coc_account_modal",
+                title: "Link CoC Account",
+                components: [
+                  {
+                    type: 1, // ACTION_ROW
+                    components: [
+                      {
+                        type: 4, // TEXT_INPUT
+                        custom_id: "player_tag_input",
+                        label: "Your Player Tag",
+                        style: 1, // SHORT
+                        min_length: 3,
+                        max_length: 15,
+                        placeholder: "#ABC123 or ABC123",
+                        required: true
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+          return res.status(200).end();
+        } catch (error) {
+          logger.error("Failed to open modal", { error });
+          return res.status(500).json({ error: "Failed to open modal" });
+        }
+      }
+      
       logger.warn("Unknown button custom_id", { custom_id: customId });
       return res.status(400).json({ error: "Unknown button" });
+    }
+    
+    // Handle MODAL SUBMISSIONS
+    else if (message.type === 5) { // InteractionType.MODAL_SUBMIT
+      logger.debug("Handling modal submission", { custom_id: message.data?.custom_id });
+      
+      const customId = message.data?.custom_id;
+      
+      if (customId === "link_coc_account_modal") {
+        return handleCocLinkModal(message, res);
+      }
+      
+      logger.warn("Unknown modal custom_id", { custom_id: customId });
+      return res.status(400).json({ error: "Unknown modal" });
     }
     
     // Handle APPLICATION_COMMAND (slash commands)

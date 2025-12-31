@@ -49,13 +49,22 @@ export interface SimplifiedInteraction {
     type: number;
     custom_id?: string;
     component_type?: number;
+    // NEW: Modal-specific fields
+    components?: Array<{
+      type: number;
+      components: Array<{
+        type: number;
+        custom_id: string;
+        value?: string;
+      }>;
+    }>;
   };
   id: string;
   channel_id: string;
   application_id: string;
   token: string;
-  member: {
-    user: {
+  member?: {
+    user?: {
       id: string;
       username: string;
       avatar: string;
@@ -64,7 +73,7 @@ export interface SimplifiedInteraction {
     };
     permissions: string;
   };
-  guild_id: string;
+  guild_id?: string;
   locale: string;
   guild_locale: string;
   message?: {

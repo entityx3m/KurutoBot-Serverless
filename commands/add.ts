@@ -9,7 +9,7 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-import { RecruitmentTracker } from "../utils/recruitment";
+import { kv } from '@vercel/kv';
 
 // Guild ID check constant
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
@@ -72,12 +72,18 @@ export default {
           { name: "CH (Clash Heros)", value: "CH" }
         ]
       },
-      // NEW: Added player_tag parameter
+      // UPDATED: Made player_tag optional, added force option
       {
         name: "player_tag",
-        description: "Player's Clash of Clans tag (e.g., #ABC123)",
+        description: "Player's Clash of Clans tag (optional if member has linked account)",
         type: ApplicationCommandOptionType.String,
-        required: true,
+        required: false,
+      },
+      {
+        name: "force",
+        description: "Force add even if player is in different clan?",
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
       },
       {
         name: "pingclan",
@@ -110,7 +116,7 @@ export default {
 
     const chatInteraction = interaction;
 
-    // Find options (UPDATED: Added player_tag option)
+    // Find options (UPDATED: Added force option, made player_tag optional)
     const memberOption = chatInteraction.data.options?.find(
       (option) => option.name === "member"
     ) as any;
@@ -120,6 +126,9 @@ export default {
     const playerTagOption = chatInteraction.data.options?.find(
       (option) => option.name === "player_tag"
     ) as any;
+    const forceOption = chatInteraction.data.options?.find(
+      (option) => option.name === "force"
+    ) as any;
     const pingClanOption = chatInteraction.data.options?.find(
       (option) => option.name === "pingclan"
     ) as any;
@@ -127,15 +136,37 @@ export default {
     const memberId = memberOption?.value;
     const clan = clanOption?.value;
     const rawPlayerTag = playerTagOption?.value;
+    const force = forceOption?.value || false;
     const pingClan = pingClanOption?.value;
 
-    // NEW: Validate player tag
-    let playerTag = rawPlayerTag?.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (!playerTag || !/^[A-Z0-9]{3,15}$/.test(playerTag)) {
-      return {
-        content: "❌ **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
-        flags: MessageFlags.Ephemeral,
-      };
+    // NEW: Check for linked account if no player_tag provided
+    let playerTag: string;
+    if (!rawPlayerTag) {
+      // Try to get linked account from KV
+      try {
+        const linkedTag = await kv.get(`linked:${memberId}`);
+        if (!linkedTag || typeof linkedTag !== 'string') {
+          return {
+            content: `❌ **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in the verification channel\n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
+            flags: MessageFlags.Ephemeral,
+          };
+        }
+        playerTag = linkedTag;
+      } catch (error) {
+        return {
+          content: "❌ Failed to check for linked account. Please provide player_tag manually.",
+          flags: MessageFlags.Ephemeral,
+        };
+      }
+    } else {
+      // Validate manually provided player tag
+      playerTag = rawPlayerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!playerTag || !/^[A-Z0-9]{3,15}$/.test(playerTag)) {
+        return {
+          content: "❌ **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+          flags: MessageFlags.Ephemeral,
+        };
+      }
     }
 
     // Get member from resolved data
@@ -182,16 +213,21 @@ export default {
       const playerName = playerData.name;
       const thLevel = playerData.townHallLevel;
       
-      // NEW: Check if player is in the correct clan
+      // UPDATED: Check if player is in the correct clan (with force option)
       if (playerData.clan) {
         const expectedClanTag = clanInfo.tag.replace('#', '');
         const actualClanTag = playerData.clan.tag.replace('#', '');
         
-        if (actualClanTag !== expectedClanTag) {
+        if (actualClanTag !== expectedClanTag && !force) {
           return {
-            content: `⚠️ **Clan Mismatch**\nPlayer ${playerName} is in clan **${playerData.clan.name}**, not **${clanInfo.name}**.\n\n*To proceed anyway, run the command again.*`,
+            content: `⚠️ **Clan Mismatch**\nPlayer **${playerName}** is in clan **${playerData.clan.name}**, not **${clanInfo.name}**.\n\n*To proceed anyway, use the \`force\` option:*\n\`/add member:@${memberUser.username} clan:${clan} force:true\``,
             flags: MessageFlags.Ephemeral,
           };
+        }
+        
+        if (actualClanTag !== expectedClanTag && force) {
+          // Log the forced addition
+          console.log(`⚠️ Force adding ${playerName} to ${clanInfo.name} despite being in ${playerData.clan.name}`);
         }
       }
 
