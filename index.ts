@@ -13,34 +13,37 @@ import {
 } from "./utils/types";
 import { RecruitmentTracker } from "./utils/recruitment";
 
+// UPDATED: New embed format using API data
 async function createRecruitmentEmbed() {
   const summary = await RecruitmentTracker.getSummary();
-  const { clans, totalNeeded, totalCurrent, remaining, overallProgress } = summary;
+  const { clans, totalMembers, totalCapacity, totalEmptySlots, overallFillPercentage } = summary;
   
-  let description = `**Total Recruitment Status**\n` +
-                   `🎯 **Goal:** ${totalNeeded} recruits\n` +
-                   `📊 **Current:** ${totalCurrent} recruits\n` +
-                   `📈 **Remaining:** ${remaining} (${overallProgress}%)\n\n` +
+  let description = `**📊 Overall Alliance Status**\n` +
+                   `👥 **Total Members:** ${totalMembers}/${totalCapacity}\n` +
+                   `📈 **Overall Fill Rate:** ${overallFillPercentage}%\n` +
+                   `🎯 **Total Recruits Needed:** ${totalEmptySlots}\n\n` +
                    `**Clan Breakdown:**\n`;
   
   clans.forEach((clan: any) => {
-    const progress = clan.needed > 0 ? Math.min(Math.round((clan.current / clan.needed) * 100), 100) : 0;
-    const progressBar = RecruitmentTracker.createProgressBar(progress);
-    const remainingClan = Math.max(0, clan.needed - clan.current);
+    const neededRecruits = RecruitmentTracker.calculateNeededRecruits(clan.memberCount);
+    const fillPercentage = Math.round((clan.memberCount / 50) * 100);
+    const progressBar = RecruitmentTracker.createProgressBar(fillPercentage);
     
     description += `\n**${clan.name} (${clan.clan})**\n` +
-                  `> 🎯 Goal: ${clan.needed}\n` +
-                  `> 📊 Current: ${clan.current}\n` +
-                  `> 📈 Remaining: ${remainingClan}\n` +
-                  `> ${progressBar} ${progress}%\n`;
+                  `> 👥 **Members:** ${clan.memberCount}/50\n` +
+                  `> 🎯 **Recruits Needed:** ${neededRecruits}\n` +
+                  `> 📊 **Fill Rate:** ${fillPercentage}%\n` +
+                  `> ${progressBar}\n`;
   });
   
+  description += `\n*Data automatically fetched from Clash of Clans API*\n*Click refresh to update*`;
+  
   return {
-    title: "📋 BOOM House Recruitment Status",
+    title: "🏰 BOOM House Recruitment Status",
     description: description,
     color: 0x5865F2,
     footer: {
-      text: "Click refresh below to update • Last updated"
+      text: "Last updated"
     },
     timestamp: new Date().toISOString()
   };
@@ -154,6 +157,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               headers: { "Content-Type": "application/json" },
             },
           );
+          
+          // UPDATED: Fetch fresh API data before creating embed
+          await RecruitmentTracker.updateFromAPI();
           
           // Update the message with fresh data
           const embed = await createRecruitmentEmbed();

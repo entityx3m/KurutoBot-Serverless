@@ -81,9 +81,6 @@ export class RecruitmentTracker {
     }
   }
 
-  // Remove setRecruitment, incrementCurrent, resetCurrent methods
-  // We don't need them anymore since we use API data
-
   static async getClan(clan: string): Promise<ClanRecruitment | null> {
     try {
       const data = await kv.hget<ClanRecruitment>(this.KEY, clan.toUpperCase());
