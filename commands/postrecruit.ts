@@ -38,23 +38,13 @@ export default {
       await RecruitmentTracker.updateFromAPI();
       
       const { embed, components } = await createRecruitmentMessage();
-      
-      // Post in the current channel
-      await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          embeds: [embed],
-          components: [components]
-        }),
-      });
-      
+
+      // Return the embed/components as the command response so the bot's
+      // interaction original message can be patched by the refresh handler.
       return {
-        content: "✅ Recruitment status posted with refresh button! (Auto-fetched from CoC API)",
-        flags: MessageFlags.Ephemeral,
+        content: "",
+        embeds: [embed],
+        components: components,
       };
       
     } catch (error) {
@@ -102,19 +92,21 @@ async function createRecruitmentMessage() {
     timestamp: new Date().toISOString()
   };
   
-  // Create refresh button component
-  const components = {
-    type: 1, // ACTION_ROW
-    components: [
-      {
-        type: 2, // BUTTON
-        style: 1, // PRIMARY
-        custom_id: "refresh_recruitment",
-        label: "🔄 Refresh",
-        emoji: { name: "🔄" }
-      }
-    ]
-  };
-  
+  // Create refresh button component (return an array of action rows)
+  const components = [
+    {
+      type: 1, // ACTION_ROW
+      components: [
+        {
+          type: 2, // BUTTON
+          style: 1, // PRIMARY
+          custom_id: "refresh_recruitment",
+          label: "🔄 Refresh",
+          emoji: { name: "🔄" }
+        }
+      ]
+    }
+  ];
+
   return { embed, components };
 }

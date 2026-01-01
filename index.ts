@@ -430,7 +430,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await axios.post(
             `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
             {
-              type: InteractionResponseType.DeferredChannelMessageWithSource,
+              type: InteractionResponseType.DeferredMessageUpdate,
             },
             {
               headers: { "Content-Type": "application/json" },
@@ -639,14 +639,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 type: 2,
                 style: 1, // PRIMARY
                 custom_id: "show_set_main",
-                label: "⭐ Set Main Account",
+                label: "Set Main Account",
                 emoji: { name: "⭐" }
               }]
             });
           }
-          
-          accountList += `\n**Click a button above to view that account**\nOr use `/player` command for more options.`;
-          
+
+          accountList += `\n**Click a button above to view that account**\nOr use \`/player\` command for more options.`;
+
           await axios.post(
             `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
             {
@@ -856,7 +856,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 type: 2, // BUTTON
                 style: 1, // PRIMARY
                 custom_id: `set_main:${selectedTag}`,
-                label: "⭐ Set as Main",
+                label: "Set as Main",
                 emoji: { name: "⭐" }
               }]
             });
@@ -934,14 +934,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const embed = {
             title: `👤 ${playerData.name} (#${playerTag})`,
             color: 0x5865F2,
-            thumbnail: playerData.league?.iconUrls?.medium ? { url: playerData.league.iconUrls.medium } : undefined,
+            thumbnail: playerData.leagueTier?.iconUrls?.large ? { url: playerData.leagueTier.iconUrls.large } : undefined,
             fields: [
               { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
               { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
               { 
                 name: "🏆 League", 
                 value: playerData.leagueTier ? 
-                  `${playerData.leagueTier.name}${playerData.league ? ` (${playerData.league.name})` : ''}` : 
+                  `${playerData.leagueTier.name}` : 
                   "Unranked", 
                 inline: true 
               },
@@ -990,6 +990,181 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           
         } catch (error) {
           logger.error("Failed to handle view_account:", error);
+          return res.status(500).end();
+        }
+      }
+
+      // Handle show_set_main button
+      if (customId === "show_set_main") {
+        try {
+          const userId = message.member?.user?.id;
+          
+          if (!userId) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ Could not identify user.",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          // Get user data
+          const userData = await getUserData(userId);
+          if (!userData || userData.accounts.length < 2) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ You need at least 2 accounts to set a main account.",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          // Create dropdown for selecting main account
+          const options = userData.accounts.map((account) => ({
+            label: `${account.playerName} | TH${account.townHallLevel}${account.isMain ? ' ⭐' : ''}`,
+            value: account.playerTag,
+            description: `#${account.playerTag}`,
+            default: account.isMain
+          }));
+          
+          const components = [{
+            type: 1,
+            components: [{
+              type: 3, // SELECT_MENU
+              custom_id: "select_main_account",
+              placeholder: "Select your main account",
+              options: options.slice(0, 25) // Discord limit
+            }]
+          }];
+          
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+            {
+              type: InteractionResponseType.ChannelMessageWithSource,
+              data: {
+                content: "**⭐ Select your main account:**\nYour main account determines your nickname and is shown first in your profile.",
+                components: components,
+                flags: MessageFlags.Ephemeral,
+              },
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          return res.status(200).end();
+          
+        } catch (error) {
+          logger.error("Failed to handle show_set_main:", error);
+          return res.status(500).end();
+        }
+      }
+
+      // Handle select_main_account dropdown
+      if (customId === "select_main_account") {
+        try {
+          const selectedTag = message.data?.values?.[0];
+          const userId = message.member?.user?.id;
+          
+          if (!selectedTag || !userId) {
+            return res.status(400).end();
+          }
+          
+          // Defer the response
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+            {
+              type: InteractionResponseType.DeferredMessageUpdate,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          
+          // Get user data
+          const userData = await getUserData(userId);
+          if (!userData) {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: "❌ No user data found.",
+                flags: MessageFlags.Ephemeral,
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          // Update main account logic
+          let found = false;
+          let newMainAccount: PlayerAccount | null = null;
+          
+          for (const account of userData.accounts) {
+            if (account.playerTag === selectedTag) {
+              account.isMain = true;
+              found = true;
+              newMainAccount = account;
+            } else {
+              account.isMain = false;
+            }
+          }
+          
+          if (!found || !newMainAccount) {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: `❌ Account #${selectedTag} not found in your linked accounts.`,
+                flags: MessageFlags.Ephemeral,
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          userData.mainAccountTag = selectedTag;
+          userData.lastUpdated = new Date().toISOString();
+          
+          // Update nickname
+          const guildId = message.guild_id;
+          if (guildId) {
+            try {
+              const nickname = `${newMainAccount.playerName} | TH${newMainAccount.townHallLevel}`;
+              await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ nick: nickname }),
+              });
+              userData.nickname = nickname;
+            } catch (nicknameError) {
+              console.warn('Failed to update nickname:', nicknameError);
+            }
+          }
+          
+          await setUserData(userId, userData);
+          
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+            {
+              content: `✅ **Main Account Updated!**\n\n⭐ **${newMainAccount.playerName}** (#${selectedTag}) is now your main account.\n\nYour nickname has been updated.`,
+              flags: MessageFlags.Ephemeral,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          
+          return res.status(200).end();
+          
+        } catch (error) {
+          logger.error("Failed to handle select_main_account:", error);
           return res.status(500).end();
         }
       }

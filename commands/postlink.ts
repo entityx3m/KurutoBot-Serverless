@@ -9,7 +9,6 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-import { getUserData } from "../utils/kvHelper";
 
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
@@ -56,55 +55,32 @@ export default {
             inline: false
           }
         ],
-      };
-
-      // If possible, include the invoking user's link status
-      try {
-        const userId = interaction.member?.user?.id;
-        if (userId) {
-          const userData = await getUserData(userId);
-          const linkedCount = userData?.accounts?.length || 0;
-          const mainTag = userData?.mainAccountTag ? `#${userData.mainAccountTag}` : 'None';
-          const statusField = {
-            name: "🔗 Your Link Status",
-            value: linkedCount > 0
-              ? `You have ${linkedCount} linked account${linkedCount > 1 ? 's' : ''}. Main: ${mainTag}`
-              : "You don't have any linked CoC accounts. Click the button below to link one.",
-            inline: false,
-          };
-
-          // Append the status field to the embed's fields
-          embed.fields.push(statusField as any);
-        }
-      } catch (err) {
-        // Non-fatal: ignore if KV lookup fails
-        console.warn('Could not fetch user link status for postlink:', err);
-      }
-        ],
         footer: {
           text: "BOOM House • Account Verification"
         }
       };
       
-      const components = {
-        type: 1, // ACTION_ROW
-        components: [
-          {
-            type: 2, // BUTTON
-            style: 3, // SUCCESS (green)
-            custom_id: "link_coc_account",
-            label: "Link Account",
-            emoji: { name: "🔗" }
-          },
-          {
-            type: 2, // BUTTON
-            style: 2, // SECONDARY (gray)
-            custom_id: "manage_accounts",
-            label: "My Accounts",
-            emoji: { name: "📋" }
-          }
-        ]
-      };
+      const components = [
+        {
+          type: 1, // ACTION_ROW
+          components: [
+            {
+              type: 2, // BUTTON
+              style: 3, // SUCCESS (green)
+              custom_id: "link_coc_account",
+              label: "Link Account",
+              emoji: { name: "🔗" }
+            },
+            {
+              type: 2, // BUTTON
+              style: 2, // SECONDARY (gray)
+              custom_id: "manage_accounts",
+              label: "My Accounts",
+              emoji: { name: "📋" }
+            }
+          ]
+        }
+      ];
       
       // Post in the current channel
       await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages`, {
@@ -115,7 +91,7 @@ export default {
         },
         body: JSON.stringify({
           embeds: [embed],
-          components: [components]
+          components: components
         }),
       });
       
