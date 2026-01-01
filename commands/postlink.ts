@@ -35,23 +35,23 @@ export default {
     
     try {
       const embed = {
-        title: "🔗 Link Your Clash of Clans Account",
+        title: "<a:rg_blink:1059237744309715025> Link Your Clash of Clans Account",
         description: "Link your CoC account(s) to get verified and join our clans!\n\n**Click the button below to link your account!**",
         color: 0x5865F2,
         fields: [
           {
-            name: "📋 How to find your Player Tag",
+            name: "<a:ClashOfClansLogo:1359002003598082088> How to find your Player Tag",
             value: "1. Open Clash of Clans\n2. Tap your profile\n3. Look for the tag under your name (starts with #)\n4. Copy the entire tag including the # symbol",
             inline: false
           },
           {
-            name: "✅ Benefits",
-            value: "• Apply to join our clans\n• Chat with staff in support channels\n• Get verified member status\n• Link multiple accounts\n• Set a main account for your nickname",
+            name: "<a:AnimatedCheck:1427570005750448169> Benefits",
+            value: "• Apply to join our clans\n• Chat with staff in support tickets\n• Get verified member role and status\n• Easily access your CoC account data using `/player` command.",
             inline: false
           },
           {
-            name: "🔗 Multiple Accounts",
-            value: "You can link multiple CoC accounts! Your first account becomes your main, but you can change it later with `/player` command.",
+            name: "<a:Warning:751524100786225233> Note",
+            value: "• You can link multiple CoC accounts\n• Your first account becomes your main\n• You can change your main account with `/player` command.\n• Your nickname will be updated to your CoC player name upon verification.",
             inline: false
           }
         ],
@@ -94,7 +94,7 @@ export default {
       });
       
       return {
-        content: "✅ Account linking embed posted!",
+        content: "<a:AnimatedCheck:1427570005750448169> Account linking embed posted!",
         flags: MessageFlags.Ephemeral,
       };
       

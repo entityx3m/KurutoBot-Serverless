@@ -10,7 +10,6 @@ export interface PlayerAccount {
   playerName: string;
   townHallLevel: number;
   expLevel: number;
-  league?: string;
   leagueTier?: {
     name: string;
     iconUrls?: {
@@ -23,11 +22,11 @@ export interface PlayerAccount {
     tag: string;
     name: string;
   };
-  role?: string; // Clan role (member, elder, coleader, leader)
-  warPreference?: string; // "in" or "out"
+  role?: string;
+  warPreference?: string;
   isMain: boolean;
   linkedAt: string;
-  linkedBy?: string; // Discord ID of who linked it
+  linkedBy?: string;
 }
 
 export interface UserData {

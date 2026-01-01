@@ -61,13 +61,14 @@ export default {
       };
     }
 
-    // If no tag provided, show accounts with unlink buttons
+    // If no tag provided, show accounts with buttons
     if (!rawPlayerTag) {
       let accountList = "**📋 Your Linked Accounts:**\n\n";
       
       // Create buttons for each account
-      const components = [];
-      const actionRow = {
+      const components: any[] = [];
+      const actionRows: Array<{ type: number; components: any[] }> = [];
+      let currentRow = {
         type: 1,
         components: [] as any[]
       };
@@ -77,20 +78,29 @@ export default {
         accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
         
         // Add button for each account (max 5 per row, Discord limit)
-        if (index < 5) {
-          actionRow.components.push({
-            type: 2,
-            style: 2, // SECONDARY
-            custom_id: `unlink_account:${account.playerTag}`,
-            label: `${index + 1}. ${account.playerName.slice(0, 10)}${account.playerName.length > 10 ? '...' : ''}`,
-            emoji: account.isMain ? { name: "⭐" } : undefined
-          });
+        const button = {
+          type: 2,
+          style: 2, // SECONDARY
+          custom_id: `unlink_account:${account.playerTag}:${userId}`,
+          label: `${index + 1}. ${account.playerName.slice(0, 10)}${account.playerName.length > 10 ? '...' : ''}`,
+          emoji: account.isMain ? { name: "⭐" } : undefined
+        };
+        
+        currentRow.components.push(button);
+        
+        // Start new row after 5 buttons (Discord limit)
+        if (currentRow.components.length >= 5 || index === userData.accounts.length - 1) {
+          actionRows.push(currentRow);
+          if (index < userData.accounts.length - 1) {
+            currentRow = {
+              type: 1,
+              components: []
+            };
+          }
         }
       });
       
-      if (actionRow.components.length > 0) {
-        components.push(actionRow);
-      }
+      components.push(...actionRows);
       
       accountList += `\n**Click a button above to unlink that account**\nOr type: \`/unlink player_tag:#TAG\``;
       
@@ -204,6 +214,7 @@ export default {
 
     return {
       content: responseText,
+      flags: MessageFlags.Ephemeral,
     };
   },
 };

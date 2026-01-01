@@ -164,9 +164,9 @@ async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelRes
     const playerName = playerData.name;
     const thLevel = playerData.townHallLevel;
     const expLevel = playerData.expLevel;
-    const leagueTier = playerData.league ? {
-      name: playerData.league.name,
-      iconUrls: playerData.league.iconUrls
+    const leagueTier = playerData.leagueTier ? {
+      name: playerData.leagueTier.name,
+      iconUrls: playerData.leagueTier.iconUrls
     } : undefined;
     const clan = playerData.clan ? {
       tag: playerData.clan.tag,
@@ -531,7 +531,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (typeof customId === "string" && customId.startsWith("set_main:")) {
         try {
-          const playerTag = customId.replace("set_main:", "");
+          const parts = customId.split(":");
+          const playerTag = parts[1];
           const userId = message.member?.user?.id;
 
           if (!userId) {
@@ -541,6 +542,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 type: InteractionResponseType.ChannelMessageWithSource,
                 data: {
                   content: "❌ Could not identify user.",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          // VERIFY USER OWNS THE ACCOUNT
+          const userData = await getUserData(userId);
+          if (!userData || !userData.accounts.some(acc => acc.playerTag === playerTag)) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ This button is for someone else's account.",
                   flags: MessageFlags.Ephemeral,
                 },
               },
@@ -559,20 +577,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
 
           // Update main account logic
-          const userData = await getUserData(userId);
-          if (!userData) {
-            await axios.patch(
-              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
-              {
-                content: "❌ No user data found.",
-                flags: MessageFlags.Ephemeral,
-              },
-              { headers: { "Content-Type": "application/json" } }
-            );
-            return res.status(200).end();
-          }
-
-          // Find and update main account
           let found = false;
           for (const account of userData.accounts) {
             if (account.playerTag === playerTag) {
@@ -685,7 +689,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             fields: [
               { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
               { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
-              { name: "🏆 League", value: playerData.league?.name || "Unranked", inline: true },
+              { name: "🏆 League", value: playerData.leagueTier?.name || "Unranked", inline: true },
               { name: "⚔️ War Stars", value: playerData.warStars?.toString() || "0", inline: true },
               { name: "🎯 Trophies", value: playerData.trophies?.toString() || "0", inline: true },
               { name: "🏆 Best Trophies", value: playerData.bestTrophies?.toString() || "0", inline: true },
@@ -740,16 +744,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Handle unlink_account button
       if (customId && customId.startsWith("unlink_account:")) {
         try {
-          const playerTag = customId.replace("unlink_account:", "");
+          const parts = customId.split(":");
+          const playerTag = parts[1];
+          const expectedUserId = parts[2]; // User ID from the button
+          
           const userId = message.member?.user?.id;
           
-          if (!userId) {
+          // VERIFY USER MATCHES BUTTON OWNER
+          if (!userId || userId !== expectedUserId) {
             await axios.post(
               `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
               {
                 type: InteractionResponseType.ChannelMessageWithSource,
                 data: {
-                  content: "❌ Could not identify user.",
+                  content: "❌ These buttons are for someone else's accounts. Use `/unlink` to manage your own accounts.",
                   flags: MessageFlags.Ephemeral,
                 },
               },
@@ -880,6 +888,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
             {
               content: responseText,
+              flags: MessageFlags.Ephemeral,
             },
             { headers: { "Content-Type": "application/json" } }
           );

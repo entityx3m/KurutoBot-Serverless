@@ -95,14 +95,14 @@ export default {
         const embed: any = {
           title: `👤 ${playerData.name} (#${playerTag})`,
           color: 0x5865F2,
-          thumbnail: playerData.league?.iconUrls?.medium ? { url: playerData.league.iconUrls.medium } : undefined,
+          thumbnail: playerData.leagueTier?.iconUrls?.medium ? { url: playerData.leagueTier.iconUrls.medium } : undefined,
           fields: [
             { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
             { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
             { 
               name: "🏆 League", 
               value: playerData.leagueTier ? 
-                `${playerData.leagueTier.name}${playerData.league ? ` (${playerData.league.name})` : ''}` : 
+                `${playerData.leagueTier.name}${playerData.leagueTier ? ` (${playerData.leagueTier.name})` : ''}` : 
                 "Unranked", 
               inline: true 
             },
@@ -190,14 +190,14 @@ export default {
     const embed = {
       title: `📊 ${titlePrefix} Player Stats`,
       color: 0x5865F2,
-      thumbnail: playerData.league?.iconUrls?.medium ? { url: playerData.league.iconUrls.medium } : undefined,
+      thumbnail: playerData.leagueTier?.iconUrls?.medium ? { url: playerData.leagueTier.iconUrls.medium } : undefined,
       fields: [
         { name: "👤 CoC Name", value: playerData.name || mainAccount.playerName, inline: true },
         { name: "🏷️ Player Tag", value: `#${mainAccount.playerTag}`, inline: true },
         { name: "⭐ Status", value: mainAccount.isMain ? "Main Account" : "Linked Account", inline: true },
         { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel || mainAccount.townHallLevel}`, inline: true },
         { name: "📊 Experience", value: `Level ${playerData.expLevel || mainAccount.expLevel}`, inline: true },
-        { name: "🏆 League", value: playerData.league?.name || mainAccount.league || "Unranked", inline: true },
+        { name: "🏆 League", value: playerData.leagueTier?.name || mainAccount.leagueTier || "Unranked", inline: true },
       ],
       footer: { 
         text: isSelf 

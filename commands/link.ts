@@ -113,7 +113,7 @@ export default {
       const playerName = playerData.name;
       const thLevel = playerData.townHallLevel;
       const expLevel = playerData.expLevel;
-      const league = playerData.league?.name || "Unranked";
+      const leagueTier = playerData.leagueTier?.name || "Unranked";
       const clan = playerData.clan ? {
         tag: playerData.clan.tag,
         name: playerData.clan.name
@@ -148,7 +148,7 @@ export default {
         playerName,
         townHallLevel: thLevel,
         expLevel,
-        league,
+        leagueTier,
         clan,
         role,
         warPreference,
@@ -217,7 +217,7 @@ export default {
         `**🏷️ Player Tag:** #${playerTag}\n` +
         `**🏰 Town Hall:** Level ${thLevel}\n` +
         `**📊 Experience:** Level ${expLevel}\n` +
-        `**🏆 League:** ${league}\n`;
+        `**🏆 League:** ${leagueTier}\n`;
       
       if (clan) {
         responseText += `**👑 Clan:** ${clan.name}\n`;

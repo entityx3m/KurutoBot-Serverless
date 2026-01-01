@@ -13,7 +13,10 @@ import { kv } from '@vercel/kv';
 import { 
   getUserData, 
   setUserData, 
-  getMainAccount 
+  getMainAccount,
+  getUserIdByTag,
+  linkTagToUser,
+  type PlayerAccount
 } from "../utils/kvHelper";
 
 // Guild ID check constant
@@ -40,7 +43,8 @@ const IDS = {
     FUN_CATEGORY: 'REDACTED_CHANNEL_FUN_CATEGORY_ID',
     CWL_SIGNUPS: 'REDACTED_CHANNEL_CWL_SIGNUPS_ID',
     BASE_VAULT: 'REDACTED_CHANNEL_BASE_VAULT_ID',
-    SHOWCASE_BASE: 'REDACTED_CHANNEL_SHOWCASE_BASE_ID'
+    SHOWCASE_BASE: 'REDACTED_CHANNEL_SHOWCASE_BASE_ID',
+    VERIFICATION_CHANNEL: 'REDACTED_CHANNEL_VERIFICATION_ID'
   }
 };
 
@@ -144,7 +148,7 @@ export default {
         const mainAccount = await getMainAccount(memberId);
         if (!mainAccount) {
           return {
-            content: `❌ **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in the verification channel\n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
+            content: `❌ **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in <#${IDS.CHANNELS.VERIFICATION_CHANNEL}> channel\n• Use \`/link\` to link an account.\n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
             flags: MessageFlags.Ephemeral,
           };
         }
@@ -230,6 +234,74 @@ export default {
       const guildId = interaction.guild_id;
       const commanderName = interaction.member?.user?.username || "Staff";
       const auditReason = `Accepted into ${clanInfo.name} by ${commanderName}`;
+
+      // Get or create user data for this member
+      let userData = await getUserData(memberId);
+      const isFirstAccount = !userData || userData.accounts.length === 0;
+
+      if (!userData) {
+        userData = {
+          discordId: memberId,
+          discordName: memberUser.username,
+          accounts: [],
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+
+      // Check if account already linked to this user
+      const existingAccount = userData.accounts.find(acc => acc.playerTag === playerTag);
+      if (!existingAccount) {
+        // Check if tag is already linked to someone else
+        const existingUserId = await getUserIdByTag(playerTag);
+        if (existingUserId && existingUserId !== memberId) {
+          return {
+            content: `❌ **Tag Already Used**\nAccount **#${playerTag}** is already linked to another user.`,
+            flags: MessageFlags.Ephemeral,
+          };
+        }
+        
+        // Create new account record
+        const newAccount: PlayerAccount = {
+          playerTag,
+          playerName,
+          townHallLevel: thLevel,
+          expLevel: playerData.expLevel,
+          leagueTier: playerData.leagueTier ? {
+            name: playerData.leagueTier.name,
+            iconUrls: playerData.leagueTier.iconUrls
+          } : undefined,
+          clan: playerData.clan ? {
+            tag: playerData.clan.tag,
+            name: playerData.clan.name
+          } : undefined,
+          role: playerData.role,
+          warPreference: playerData.warPreference,
+          isMain: isFirstAccount,
+          linkedAt: new Date().toISOString(),
+          linkedBy: interaction.member?.user?.id, // Staff member who added them
+        };
+        
+        // Add account to user data
+        userData.accounts.push(newAccount);
+        
+        // If this is the first account, set as main
+        if (isFirstAccount) {
+          userData.mainAccountTag = playerTag;
+        }
+        
+        // Save user data and create reverse mapping
+        await setUserData(memberId, userData);
+        await linkTagToUser(playerTag, memberId);
+        
+        console.log(`✅ Linked account #${playerTag} to ${memberUser.username} during recruitment`);
+      }
+
+      // Update recruitment info
+      userData.recruitedAt = new Date().toISOString();
+      userData.recruitedBy = interaction.member?.user?.id;
+      userData.recruiterName = interaction.member?.user?.username;
+      userData.clan = clan; // Set their BOOM clan
+      await setUserData(memberId, userData);
 
       // Set nickname format: "PlayerName | CLAN"
       const nickname = `${playerName} | ${clanInfo.abbr}`;
