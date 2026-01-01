@@ -164,3 +164,21 @@ export async function getMainAccount(userId: string): Promise<PlayerAccount | nu
   
   return userData.accounts.find(acc => acc.isMain) || userData.accounts[0] || null;
 }
+
+// Render user accounts as a display string for ephemeral messages
+export async function getUserAccountsDisplay(userId: string): Promise<string> {
+  const userData = await getUserData(userId);
+  if (!userData || userData.accounts.length === 0) {
+    return "No linked accounts found.";
+  }
+  
+  let display = `**📋 ${userData.discordName || 'User'}'s Linked Accounts:**\n\n`;
+  
+  userData.accounts.forEach((account, index) => {
+    const isMain = account.isMain ? " ⭐" : "";
+    const clanInfo = account.clan ? ` | ${account.clan.name}` : "";
+    display += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${clanInfo}${isMain}\n`;
+  });
+  
+  return display;
+}

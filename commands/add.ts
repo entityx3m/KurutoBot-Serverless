@@ -501,14 +501,13 @@ export default {
         linkingStatus = `<a:AnimatedCheck:1427570005750448169> **Account Already Linked:** Using existing account ${playerName} | TH${thLevel} (#${playerTag})\n`;
       }
 
-      const verifiedMessage = verifiedAssigned ? `<a:AnimatedCheck:1427570005750448169> Assigned **Verified** role.\n` : '';
+      const verifiedMessage = verifiedAssigned ? `**Verified**,` : '';
 
       const resultContent = `<a:AnimatedCheck:1427570005750448169> **${memberUser.username}** has been accepted into **${clanInfo.name}** by <@${interaction.member?.user?.id}>.\n` +
         `<a:AnimatedCheck:1427570005750448169> **Nickname set to:** ${nickname}\n` +
         linkingStatus +
         visitorMessage +
-        verifiedMessage +
-        `<a:AnimatedCheck:1427570005750448169> Assigned **BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
+        `<a:AnimatedCheck:1427570005750448169> Assigned ${verifiedMessage} **BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
         `<a:AnimatedCheck:1427570005750448169> A welcome DM has been sent. 📩\n` +
         `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`;
 

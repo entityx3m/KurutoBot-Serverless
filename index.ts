@@ -85,6 +85,32 @@ async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelRes
       return res.status(200).end();
     }
 
+    // If the user already has linked accounts, show them instead of processing the modal
+    const existingUserData = await getUserData(userId);
+    if (existingUserData && existingUserData.accounts.length > 0) {
+      let accountList = "**📋 You already have linked accounts!**\n\n";
+      
+      existingUserData.accounts.forEach((account, index) => {
+        const isMain = account.isMain ? " ⭐" : "";
+        accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
+      });
+      
+      accountList += "\n**Use `/player` to view your accounts or `/unlink` to remove accounts.**";
+      
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+        {
+          type: InteractionResponseType.ChannelMessageWithSource,
+          data: {
+            content: accountList,
+            flags: MessageFlags.Ephemeral,
+          },
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      return res.status(200).end();
+    }
+
     // Extract player tag from modal
     let playerTag = '';
     components.forEach((row: any) => {
@@ -450,9 +476,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       
-      // Handle link CoC account button (opens modal)
+      // Handle link CoC account button (opens modal) - check for existing accounts first
       if (customId === "link_coc_account") {
         try {
+          const userId = message.member?.user?.id;
+          
+          if (!userId) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ Could not identify user.",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          // Check if user already has linked accounts
+          const userData = await getUserData(userId);
+          if (userData && userData.accounts.length > 0) {
+            // Show their existing accounts instead of opening modal
+            let accountList = "**📋 You already have linked accounts!**\n\n";
+            
+            userData.accounts.forEach((account, index) => {
+              const isMain = account.isMain ? " ⭐" : "";
+              accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
+            });
+            
+            accountList += "\n**Use `/player` to view your accounts or `/unlink` to remove accounts.**";
+            
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: accountList,
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          // If no accounts, open the modal
           await axios.post(
             `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
             {
@@ -509,13 +580,80 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).end();
           }
 
-          // Show a simple message for now (you can expand this)
+          // Get user data
+          const userData = await getUserData(userId);
+          if (!userData || userData.accounts.length === 0) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ You don't have any linked CoC accounts.\nClick the **Link Account** button to get started!",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          // Show their accounts with buttons
+          let accountList = "**📋 Your Linked Accounts:**\n\n";
+          
+          // Create buttons for each account
+          const components: any[] = [];
+          const actionRows: any[] = [];
+          let currentRow = {
+            type: 1,
+            components: [] as any[]
+          };
+          
+          userData.accounts.forEach((account, index) => {
+            const isMain = account.isMain ? " ⭐" : "";
+            accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
+            
+            // Add button for each account (max 5 per row, Discord limit)
+            if (currentRow.components.length >= 5) {
+              components.push(currentRow);
+              currentRow = { type: 1, components: [] };
+            }
+
+            currentRow.components.push({
+              type: 2,
+              style: 2, // SECONDARY
+              custom_id: `view_account:${account.playerTag}`,
+              label: `${index + 1}. ${account.playerName.slice(0, 10)}${account.playerName.length > 10 ? '...' : ''}`,
+              emoji: account.isMain ? { name: "⭐" } : undefined
+            });
+          });
+          
+          if (currentRow.components.length > 0) {
+            components.push(currentRow);
+          }
+          
+          // Add "Set Main" button if multiple accounts
+          if (userData.accounts.length > 1) {
+            components.push({
+              type: 1,
+              components: [{
+                type: 2,
+                style: 1, // PRIMARY
+                custom_id: "show_set_main",
+                label: "⭐ Set Main Account",
+                emoji: { name: "⭐" }
+              }]
+            });
+          }
+          
+          accountList += `\n**Click a button above to view that account**\nOr use `/player` command for more options.`;
+          
           await axios.post(
             `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
             {
               type: InteractionResponseType.ChannelMessageWithSource,
               data: {
-                content: "📋 Use `/player` command to view and manage your linked accounts!",
+                content: accountList,
+                components: components,
                 flags: MessageFlags.Ephemeral,
               },
             },
@@ -737,6 +875,121 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         } catch (error) {
           logger.error("Failed to handle select_account:", error);
+          return res.status(500).end();
+        }
+      }
+
+      // Handle view_account button (shows fresh player data)
+      if (customId && customId.startsWith("view_account:")) {
+        try {
+          const playerTag = customId.replace("view_account:", "");
+          const userId = message.member?.user?.id;
+          
+          if (!userId) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ Could not identify user.",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          // Defer response
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+            {
+              type: InteractionResponseType.DeferredMessageUpdate,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          
+          // Fetch fresh data for selected account
+          const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
+            headers: { 
+              'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
+              'Accept': 'application/json' 
+            },
+          });
+          
+          if (!response.ok) {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: `❌ Failed to fetch data for account #${playerTag}`,
+                flags: MessageFlags.Ephemeral,
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          const playerData = await response.json();
+          
+          const embed = {
+            title: `👤 ${playerData.name} (#${playerTag})`,
+            color: 0x5865F2,
+            thumbnail: playerData.league?.iconUrls?.medium ? { url: playerData.league.iconUrls.medium } : undefined,
+            fields: [
+              { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
+              { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
+              { 
+                name: "🏆 League", 
+                value: playerData.leagueTier ? 
+                  `${playerData.leagueTier.name}${playerData.league ? ` (${playerData.league.name})` : ''}` : 
+                  "Unranked", 
+                inline: true 
+              },
+              { name: "⚔️ War Stars", value: playerData.warStars?.toString() || "0", inline: true },
+              { name: "🎯 Trophies", value: playerData.trophies?.toString() || "0", inline: true },
+              { name: "🏆 Best Trophies", value: playerData.bestTrophies?.toString() || "0", inline: true },
+            ],
+            footer: { text: "Account View" },
+            timestamp: new Date().toISOString()
+          };
+
+          if (playerData.warPreference) {
+            embed.fields.push({ 
+              name: "⚔️ War Preference", 
+              value: playerData.warPreference === "in" ? "Opted In ✅" : "Opted Out ❌", 
+              inline: true 
+            });
+          }
+          
+          if (playerData.role) {
+            embed.fields.push({ 
+              name: "👑 Clan Role", 
+              value: playerData.role.charAt(0).toUpperCase() + playerData.role.slice(1), 
+              inline: true 
+            });
+          }
+          
+          if (playerData.clan) {
+            embed.fields.push({ 
+              name: "👑 Clan", 
+              value: `${playerData.clan.name} (${playerData.clan.tag})`, 
+              inline: false 
+            });
+          }
+          
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+            {
+              embeds: [embed],
+              flags: MessageFlags.Ephemeral,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          
+          return res.status(200).end();
+          
+        } catch (error) {
+          logger.error("Failed to handle view_account:", error);
           return res.status(500).end();
         }
       }

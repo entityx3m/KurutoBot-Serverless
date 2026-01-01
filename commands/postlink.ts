@@ -9,6 +9,7 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
+import { getUserData } from "../utils/kvHelper";
 
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
@@ -54,6 +55,31 @@ export default {
             value: "• You can link multiple CoC accounts\n• Your first account becomes your main\n• You can change your main account with `/player` command.\n• Your nickname will be updated to your CoC player name upon verification.",
             inline: false
           }
+        ],
+      };
+
+      // If possible, include the invoking user's link status
+      try {
+        const userId = interaction.member?.user?.id;
+        if (userId) {
+          const userData = await getUserData(userId);
+          const linkedCount = userData?.accounts?.length || 0;
+          const mainTag = userData?.mainAccountTag ? `#${userData.mainAccountTag}` : 'None';
+          const statusField = {
+            name: "🔗 Your Link Status",
+            value: linkedCount > 0
+              ? `You have ${linkedCount} linked account${linkedCount > 1 ? 's' : ''}. Main: ${mainTag}`
+              : "You don't have any linked CoC accounts. Click the button below to link one.",
+            inline: false,
+          };
+
+          // Append the status field to the embed's fields
+          embed.fields.push(statusField as any);
+        }
+      } catch (err) {
+        // Non-fatal: ignore if KV lookup fails
+        console.warn('Could not fetch user link status for postlink:', err);
+      }
         ],
         footer: {
           text: "BOOM House • Account Verification"
