@@ -35,12 +35,12 @@ export default {
     
     try {
       const embed = {
-        title: "<a:rg_blink:1059237744309715025> Link Your Clash of Clans Account",
+        title: "<a:rg_blink:1456183866510282762> Link Your Clash of Clans Account",
         description: "Link your CoC account(s) to get verified and join our clans!\n\n**Click the button below to link your account!**",
         color: 0x5865F2,
         fields: [
           {
-            name: "<a:ClashOfClansLogo:1359002003598082088> How to find your Player Tag",
+            name: "<a:ClashOfClansLogo:1456185647563018330> How to find your Player Tag",
             value: "1. Open Clash of Clans\n2. Tap your profile\n3. Look for the tag under your name (starts with #)\n4. Copy the entire tag including the # symbol",
             inline: false
           },
@@ -50,7 +50,7 @@ export default {
             inline: false
           },
           {
-            name: "<a:Warning:751524100786225233> Note",
+            name: "<a:Warning:1456190079830720625> Note",
             value: "• You can link multiple CoC accounts\n• Your first account becomes your main\n• You can change your main account with `/player` command.\n• Your nickname will be updated to your CoC player name upon verification.",
             inline: false
           }

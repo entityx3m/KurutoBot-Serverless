@@ -19,13 +19,9 @@ export default {
     name: "unlink",
     description: "Unlink a Clash of Clans account from your profile",
     type: ApplicationCommandType.ChatInput,
+    initialEphemeral: true, // <--- add this
     options: [
-      {
-        name: "player_tag",
-        description: "Player tag to unlink (leave empty to see your accounts)",
-        type: ApplicationCommandOptionType.String,
-        required: false,
-      }
+      { name: "player_tag", description: "Player tag to unlink (leave empty to see your accounts)", type: ApplicationCommandOptionType.String, required: false }
     ]
   } as CommandData,
   async execute(data: {

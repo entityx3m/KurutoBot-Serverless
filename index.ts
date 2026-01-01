@@ -404,7 +404,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await axios.post(
             `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
             {
-              type: InteractionResponseType.DeferredMessageUpdate,
+              type: InteractionResponseType.DeferredChannelMessageWithSource,
             },
             {
               headers: { "Content-Type": "application/json" },
@@ -571,7 +571,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await axios.post(
             `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
             {
-              type: InteractionResponseType.DeferredMessageUpdate,
+              type: InteractionResponseType.DeferredChannelMessageWithSource,
             },
             { headers: { "Content-Type": "application/json" } }
           );
@@ -656,7 +656,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await axios.post(
             `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
             {
-              type: InteractionResponseType.DeferredMessageUpdate,
+              type: InteractionResponseType.DeferredChannelMessageWithSource,
             },
             { headers: { "Content-Type": "application/json" } }
           );
@@ -770,7 +770,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await axios.post(
             `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
             {
-              type: InteractionResponseType.DeferredMessageUpdate,
+              type: InteractionResponseType.DeferredChannelMessageWithSource,
             },
             { headers: { "Content-Type": "application/json" } }
           );

@@ -95,7 +95,7 @@ export default {
         const embed: any = {
           title: `👤 ${playerData.name} (#${playerTag})`,
           color: 0x5865F2,
-          thumbnail: playerData.leagueTier?.iconUrls?.medium ? { url: playerData.leagueTier.iconUrls.medium } : undefined,
+          thumbnail: playerData.leagueTier?.iconUrls?.large ? { url: playerData.leagueTier.iconUrls.large } : undefined,
           fields: [
             { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
             { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
@@ -190,7 +190,7 @@ export default {
     const embed = {
       title: `📊 ${titlePrefix} Player Stats`,
       color: 0x5865F2,
-      thumbnail: playerData.leagueTier?.iconUrls?.medium ? { url: playerData.leagueTier.iconUrls.medium } : undefined,
+      thumbnail: playerData.leagueTier?.iconUrls?.large ? { url: playerData.leagueTier.iconUrls.large } : undefined,
       fields: [
         { name: "👤 CoC Name", value: playerData.name || mainAccount.playerName, inline: true },
         { name: "🏷️ Player Tag", value: `#${mainAccount.playerTag}`, inline: true },

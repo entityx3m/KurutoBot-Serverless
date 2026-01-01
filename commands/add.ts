@@ -22,6 +22,7 @@ import {
 // Guild ID check constant
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1"; // NEW: Added CoC API URL
+const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
 
 // Role & Channel IDs
 const IDS = {
@@ -148,7 +149,7 @@ export default {
         const mainAccount = await getMainAccount(memberId);
         if (!mainAccount) {
           return {
-            content: `❌ **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in <#${IDS.CHANNELS.VERIFICATION_CHANNEL}> channel\n• Use \`/link\` to link an account.\n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
+            content: `❌ **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in <#${IDS.CHANNELS.VERIFICATION_CHANNEL}> channel\n• Use /link \n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
             flags: MessageFlags.Ephemeral,
           };
         }
@@ -322,6 +323,27 @@ export default {
         // Continue even if nickname fails
       }
 
+      // ASSIGN VERIFIED ROLE
+      let verifiedAssigned = false;
+      try {
+        const verifiedRoleResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${VERIFIED_ROLE_ID}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+            'Content-Type': 'application/json',
+            'X-Audit-Log-Reason': `Account added to ${clanInfo.name} by ${commanderName}`
+          },
+        });
+        if (verifiedRoleResponse.ok) {
+          verifiedAssigned = true;
+          console.log(`✅ Assigned Verified role to ${memberUser.username}`);
+        } else {
+          console.warn(`⚠️ Failed to assign Verified role to ${memberUser.username}: ${verifiedRoleResponse.statusText}`);
+        }
+      } catch (roleError) {
+        console.warn(`⚠️ Could not assign Verified role to ${memberId}:`, roleError);
+      }
+
       let visitorStatus = 'not_present'; // 'removed', 'not_present', or 'error'
 
       // First, check if user actually has the Visitor role
@@ -461,7 +483,7 @@ export default {
         console.error('Failed to send clan channel welcome:', channelError);
       }
 
-      // UPDATED: Return response with player info
+      // UPDATED: Return response with player info and linking/role status
       let visitorMessage = '';
       if (visitorStatus === 'removed') {
         visitorMessage = `<a:AnimatedCheck:1427570005750448169> Removed **Visitor** role.\n`;
@@ -471,10 +493,21 @@ export default {
         visitorMessage = `<a:redcross:1439044567415521443> Could not check/remove **Visitor** role.\n`;
       }
 
+      const wasNewlyLinked = !existingAccount;
+      let linkingStatus = '';
+      if (wasNewlyLinked) {
+        linkingStatus = `<a:AnimatedCheck:1427570005750448169> **Account Linked:** ${playerName} | TH${thLevel} (#${playerTag}) added to their profile\n`;
+      } else {
+        linkingStatus = `<a:AnimatedCheck:1427570005750448169> **Account Already Linked:** Using existing account ${playerName} | TH${thLevel} (#${playerTag})\n`;
+      }
+
+      const verifiedMessage = verifiedAssigned ? `<a:AnimatedCheck:1427570005750448169> Assigned **Verified** role.\n` : '';
+
       const resultContent = `<a:AnimatedCheck:1427570005750448169> **${memberUser.username}** has been accepted into **${clanInfo.name}** by <@${interaction.member?.user?.id}>.\n` +
-        `<a:AnimatedCheck:1427570005750448169> **Player:** ${playerName} (#${playerTag}) | TH${thLevel}\n` +
         `<a:AnimatedCheck:1427570005750448169> **Nickname set to:** ${nickname}\n` +
+        linkingStatus +
         visitorMessage +
+        verifiedMessage +
         `<a:AnimatedCheck:1427570005750448169> Assigned **BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
         `<a:AnimatedCheck:1427570005750448169> A welcome DM has been sent. 📩\n` +
         `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`;
