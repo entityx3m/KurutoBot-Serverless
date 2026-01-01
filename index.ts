@@ -12,7 +12,17 @@ import {
   type SimplifiedInteraction,
 } from "./utils/types";
 import { RecruitmentTracker } from "./utils/recruitment";
-import { getKV, setKV, getUserData, setUserData } from "./utils/kvHelper";
+import { 
+  getKV, 
+  setKV, 
+  getUserData, 
+  setUserData, 
+  getUserIdByTag,
+  unlinkTag, 
+  linkTagToUser, 
+  getMainAccount,
+  type PlayerAccount 
+} from "./utils/kvHelper";
 
 const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
 const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
@@ -75,8 +85,6 @@ async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelRes
       return res.status(200).end();
     }
 
- 
-    
     // Extract player tag from modal
     let playerTag = '';
     components.forEach((row: any) => {
@@ -104,15 +112,23 @@ async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelRes
       return res.status(200).end();
     }
     
-    // Check for existing links
-    const existingLink = await getKV<string>(`linked:${userId}`);
-    if (existingLink) {
+    // Check if tag is already linked (anywhere)
+    const existingUserId = await getUserIdByTag(playerTag);
+    if (existingUserId) {
+      const existingUser = await getUserData(existingUserId);
+      const existingAccount = existingUser?.accounts.find(acc => acc.playerTag === playerTag);
+      
+      const isSelf = existingUserId === userId;
+      const errorMessage = isSelf
+        ? `❌ **Already Linked**\nYou already have account **#${playerTag}** linked to your profile.`
+        : `❌ **Tag Already Used**\nAccount **#${playerTag}** is already linked to another user.`;
+      
       await axios.post(
         `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
         {
           type: InteractionResponseType.ChannelMessageWithSource,
           data: {
-            content: `❌ **Already Linked**\nYou are already linked to account: **#${existingLink}**\nContact staff if you need to change your linked account.`,
+            content: errorMessage,
             flags: MessageFlags.Ephemeral,
           },
         },
@@ -147,32 +163,94 @@ async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelRes
     const playerData = await response.json();
     const playerName = playerData.name;
     const thLevel = playerData.townHallLevel;
+    const expLevel = playerData.expLevel;
+    const leagueTier = playerData.league ? {
+      name: playerData.league.name,
+      iconUrls: playerData.league.iconUrls
+    } : undefined;
+    const clan = playerData.clan ? {
+      tag: playerData.clan.tag,
+      name: playerData.clan.name
+    } : undefined;
+    const role = playerData.role;
+    const warPreference = playerData.warPreference;
     
-    // Store in KV
-    await setKV(`linked:${userId}`, playerTag);
-    await setKV(`player:${playerTag}`, {
-      discordId: userId,
-      discordName: message.member?.user?.username,
-      playerTag: playerTag,
-      playerName: playerName,
+    // Get or create user data
+    let userData = await getUserData(userId);
+    const isFirstAccount = !userData || userData.accounts.length === 0;
+    
+    if (!userData) {
+      userData = {
+        discordId: userId,
+        discordName: message.member?.user?.username || 'Unknown',
+        accounts: [],
+        lastUpdated: new Date().toISOString(),
+      };
+    }
+    
+    // Create new account
+    const newAccount: PlayerAccount = {
+      playerTag,
+      playerName,
       townHallLevel: thLevel,
+      expLevel,
+      leagueTier,
+      clan,
+      role,
+      warPreference,
+      isMain: isFirstAccount,
       linkedAt: new Date().toISOString(),
-    });
+      linkedBy: userId,
+    };
     
-    // Assign Verified role
-    const auditReason = `CoC account linked via /postlink - ${playerName} (#${playerTag})`;
+    // Add account
+    userData.accounts.push(newAccount);
     
-    try {
-      await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-Audit-Log-Reason': auditReason
-        },
-      });
-    } catch (roleError) {
-      console.warn('Failed to assign Verified role:', roleError);
+    // If this is the first account, set as main
+    if (isFirstAccount) {
+      userData.mainAccountTag = playerTag;
+    }
+    
+    // Save user data
+    await setUserData(userId, userData);
+    await linkTagToUser(playerTag, userId);
+    
+    // Assign Verified role if first account
+    if (isFirstAccount) {
+      const auditReason = `CoC account linked via /postlink - ${playerName} (#${playerTag})`;
+      
+      try {
+        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+            'Content-Type': 'application/json',
+            'X-Audit-Log-Reason': auditReason
+          },
+        });
+      } catch (roleError) {
+        console.warn('Failed to assign Verified role:', roleError);
+      }
+      
+      // Set nickname for main account
+      if (newAccount.isMain) {
+        try {
+          const nickname = `${playerName} | TH${thLevel}`;
+          await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+              'Content-Type': 'application/json',
+              'X-Audit-Log-Reason': `Nickname set from main account ${playerName}`
+            },
+            body: JSON.stringify({ nick: nickname }),
+          });
+          userData.nickname = nickname;
+          await setUserData(userId, userData);
+        } catch (nicknameError) {
+          console.warn('Failed to set nickname:', nicknameError);
+        }
+      }
     }
     
     // Send success response
@@ -189,8 +267,15 @@ async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelRes
               { name: "👤 CoC Name", value: playerName, inline: true },
               { name: "🏷️ Player Tag", value: `#${playerTag}`, inline: true },
               { name: "🏰 Town Hall", value: `Level ${thLevel}`, inline: true },
+              { name: "📊 Experience", value: `Level ${expLevel}`, inline: true },
+              { name: "🏆 League", value: leagueTier?.name || "Unranked", inline: true },
+              { name: "⚔️ War Pref", value: warPreference === "in" ? "Opted In" : "Opted Out", inline: true },
             ],
-            footer: { text: "You can now apply to join our clans!" }
+            footer: { 
+              text: isFirstAccount 
+                ? "You can now apply to join our clans!" 
+                : "Use /player to manage your accounts"
+            }
           }],
           flags: MessageFlags.Ephemeral,
         },
@@ -648,6 +733,161 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         } catch (error) {
           logger.error("Failed to handle select_account:", error);
+          return res.status(500).end();
+        }
+      }
+
+      // Handle unlink_account button
+      if (customId && customId.startsWith("unlink_account:")) {
+        try {
+          const playerTag = customId.replace("unlink_account:", "");
+          const userId = message.member?.user?.id;
+          
+          if (!userId) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ Could not identify user.",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          // Defer response
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+            {
+              type: InteractionResponseType.DeferredMessageUpdate,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          
+          // Get user data
+          const userData = await getUserData(userId);
+          if (!userData) {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: "❌ No user data found.",
+                flags: MessageFlags.Ephemeral,
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          // Find the account
+          const accountIndex = userData.accounts.findIndex(acc => acc.playerTag === playerTag);
+          if (accountIndex === -1) {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: `❌ Account #${playerTag} not found in your linked accounts.`,
+                flags: MessageFlags.Ephemeral,
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+          
+          const accountToRemove = userData.accounts[accountIndex];
+          const isMainAccount = accountToRemove.isMain;
+          const isOnlyAccount = userData.accounts.length === 1;
+          
+          // Remove the account
+          userData.accounts.splice(accountIndex, 1);
+          userData.lastUpdated = new Date().toISOString();
+          await unlinkTag(playerTag);
+          
+          // Handle main account reassignment if needed
+          if (isMainAccount && userData.accounts.length > 0) {
+            userData.accounts[0].isMain = true;
+            userData.mainAccountTag = userData.accounts[0].playerTag;
+            
+            // Update nickname
+            const newMain = userData.accounts[0];
+            const guildId = message.guild_id!;
+            try {
+              const nickname = `${newMain.playerName} | TH${newMain.townHallLevel}`;
+              await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ nick: nickname }),
+              });
+              userData.nickname = nickname;
+            } catch (nicknameError) {
+              console.warn('Failed to update nickname:', nicknameError);
+            }
+          } else if (isOnlyAccount) {
+            userData.mainAccountTag = undefined;
+            userData.nickname = undefined;
+            
+            // Remove nickname and Verified role
+            const guildId = message.guild_id!;
+            try {
+              await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ nick: null }),
+              });
+            } catch (nicknameError) {
+              console.warn('Failed to remove nickname:', nicknameError);
+            }
+            
+            try {
+              await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+            } catch (roleError) {
+              console.warn('Failed to remove Verified role:', roleError);
+            }
+          }
+          
+          // Save updated data
+          await setUserData(userId, userData);
+          
+          let responseText = `✅ **Account Unlinked!**\n\n` +
+            `**👤 Account:** ${accountToRemove.playerName}\n` +
+            `**🏷️ Player Tag:** #${accountToRemove.playerTag}\n\n`;
+          
+          if (isMainAccount && userData.accounts.length > 0) {
+            const newMain = userData.accounts[0];
+            responseText += `⭐ **New main account:** ${newMain.playerName} (#${newMain.playerTag})\n`;
+          }
+          
+          if (isOnlyAccount) {
+            responseText += `📝 **No accounts remaining.** Verified role and nickname removed.\n`;
+          } else {
+            responseText += `📊 **Remaining accounts:** ${userData.accounts.length}`;
+          }
+          
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+            {
+              content: responseText,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          
+          return res.status(200).end();
+          
+        } catch (error) {
+          logger.error("Failed to handle unlink_account button:", error);
           return res.status(500).end();
         }
       }

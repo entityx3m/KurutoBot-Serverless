@@ -1,6 +1,9 @@
 // utils/kvHelper.ts
 import { kv } from '@vercel/kv';
 
+// Add server prefix to avoid collisions with other bots
+const SERVER_PREFIX = process.env.GUILD_ID || 'BOOM_HOUSE';
+
 // Types for our data structure
 export interface PlayerAccount {
   playerTag: string;
@@ -8,12 +11,20 @@ export interface PlayerAccount {
   townHallLevel: number;
   expLevel: number;
   league?: string;
+  leagueTier?: {
+    name: string;
+    iconUrls?: {
+      small?: string;
+      medium?: string;
+      large?: string;
+    };
+  };
   clan?: {
     tag: string;
     name: string;
   };
-  role?: string;
-  warPreference?: string;
+  role?: string; // Clan role (member, elder, coleader, leader)
+  warPreference?: string; // "in" or "out"
   isMain: boolean;
   linkedAt: string;
   linkedBy?: string; // Discord ID of who linked it
@@ -32,10 +43,15 @@ export interface UserData {
   lastUpdated: string;
 }
 
+// Helper to create server-specific keys
+function createKey(key: string): string {
+  return `${SERVER_PREFIX}:${key}`;
+}
+
 // Basic KV operations
 export async function getKV<T = any>(key: string): Promise<T | null> {
   try {
-    return await kv.get<T>(key);
+    return await kv.get<T>(createKey(key));
   } catch (error) {
     console.error(`Failed to get KV key ${key}:`, error);
     return null;
@@ -44,7 +60,7 @@ export async function getKV<T = any>(key: string): Promise<T | null> {
 
 export async function setKV<T = any>(key: string, value: T): Promise<boolean> {
   try {
-    await kv.set(key, value);
+    await kv.set(createKey(key), value);
     return true;
   } catch (error) {
     console.error(`Failed to set KV key ${key}:`, error);
@@ -54,7 +70,7 @@ export async function setKV<T = any>(key: string, value: T): Promise<boolean> {
 
 export async function deleteKV(key: string): Promise<boolean> {
   try {
-    await kv.del(key);
+    await kv.del(createKey(key));
     return true;
   } catch (error) {
     console.error(`Failed to delete KV key ${key}:`, error);
@@ -65,7 +81,7 @@ export async function deleteKV(key: string): Promise<boolean> {
 // User data operations
 export async function getUserData(userId: string): Promise<UserData | null> {
   try {
-    const data = await kv.get<UserData>(`user:${userId}`);
+    const data = await kv.get<UserData>(createKey(`user:${userId}`));
     return data;
   } catch (error) {
     console.error(`Failed to get user data for ${userId}:`, error);
@@ -76,7 +92,7 @@ export async function getUserData(userId: string): Promise<UserData | null> {
 export async function setUserData(userId: string, data: UserData): Promise<boolean> {
   try {
     data.lastUpdated = new Date().toISOString();
-    await kv.set(`user:${userId}`, data);
+    await kv.set(createKey(`user:${userId}`), data);
     return true;
   } catch (error) {
     console.error(`Failed to set user data for ${userId}:`, error);
@@ -84,11 +100,10 @@ export async function setUserData(userId: string, data: UserData): Promise<boole
   }
 }
 
-// EFFICIENT: Reverse lookup using tag -> userId mapping
+// Get reverse mapping (tag → userId)
 export async function getUserIdByTag(playerTag: string): Promise<string | null> {
   try {
-    // We store tag:ABC123 -> "userId"
-    const userId = await kv.get<string>(`tag:${playerTag}`);
+    const userId = await kv.get<string>(createKey(`tag:${playerTag}`));
     return userId;
   } catch (error) {
     console.error(`Failed to get userId for tag ${playerTag}:`, error);
@@ -99,7 +114,7 @@ export async function getUserIdByTag(playerTag: string): Promise<string | null> 
 // Link a player tag to a user (creates reverse mapping)
 export async function linkTagToUser(playerTag: string, userId: string): Promise<boolean> {
   try {
-    await kv.set(`tag:${playerTag}`, userId);
+    await kv.set(createKey(`tag:${playerTag}`), userId);
     return true;
   } catch (error) {
     console.error(`Failed to link tag ${playerTag} to user ${userId}:`, error);
@@ -110,7 +125,7 @@ export async function linkTagToUser(playerTag: string, userId: string): Promise<
 // Unlink a player tag (removes reverse mapping)
 export async function unlinkTag(playerTag: string): Promise<boolean> {
   try {
-    await kv.del(`tag:${playerTag}`);
+    await kv.del(createKey(`tag:${playerTag}`));
     return true;
   } catch (error) {
     console.error(`Failed to unlink tag ${playerTag}:`, error);
@@ -121,15 +136,12 @@ export async function unlinkTag(playerTag: string): Promise<boolean> {
 // Get account by tag (efficient version using reverse mapping)
 export async function getAccountByTag(playerTag: string): Promise<{userId: string, account: PlayerAccount} | null> {
   try {
-    // First get the userId from reverse mapping
     const userId = await getUserIdByTag(playerTag);
     if (!userId) return null;
     
-    // Then get the user data
     const userData = await getUserData(userId);
     if (!userData) return null;
     
-    // Find the specific account
     const account = userData.accounts.find(acc => acc.playerTag === playerTag);
     if (!account) return null;
     
@@ -138,4 +150,18 @@ export async function getAccountByTag(playerTag: string): Promise<{userId: strin
     console.error(`Failed to get account by tag ${playerTag}:`, error);
     return null;
   }
+}
+
+// Check if user has linked accounts (simple check)
+export async function hasLinkedAccount(userId: string): Promise<boolean> {
+  const userData = await getUserData(userId);
+  return userData !== null && userData.accounts.length > 0;
+}
+
+// Get main account
+export async function getMainAccount(userId: string): Promise<PlayerAccount | null> {
+  const userData = await getUserData(userId);
+  if (!userData) return null;
+  
+  return userData.accounts.find(acc => acc.isMain) || userData.accounts[0] || null;
 }

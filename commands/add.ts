@@ -10,6 +10,11 @@ import type {
   SimplifiedInteraction,
 } from "../utils/types";
 import { kv } from '@vercel/kv';
+import { 
+  getUserData, 
+  setUserData, 
+  getMainAccount 
+} from "../utils/kvHelper";
 
 // Guild ID check constant
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
@@ -131,19 +136,19 @@ export default {
     const force = forceOption?.value || false;
     
 
-    // NEW: Check for linked account if no player_tag provided
+    // Check for linked account if no player_tag provided
     let playerTag: string;
     if (!rawPlayerTag) {
-      // Try to get linked account from KV
+      // Try to get linked account from user data
       try {
-        const linkedTag = await kv.get(`linked:${memberId}`);
-        if (!linkedTag || typeof linkedTag !== 'string') {
+        const mainAccount = await getMainAccount(memberId);
+        if (!mainAccount) {
           return {
             content: `❌ **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in the verification channel\n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
             flags: MessageFlags.Ephemeral,
           };
         }
-        playerTag = linkedTag;
+        playerTag = mainAccount.playerTag;
       } catch (error) {
         return {
           content: "❌ Failed to check for linked account. Please provide player_tag manually.",
@@ -226,7 +231,7 @@ export default {
       const commanderName = interaction.member?.user?.username || "Staff";
       const auditReason = `Accepted into ${clanInfo.name} by ${commanderName}`;
 
-      // NEW: Set nickname format: "PlayerName | CLAN"
+      // Set nickname format: "PlayerName | CLAN"
       const nickname = `${playerName} | ${clanInfo.abbr}`;
       
       try {

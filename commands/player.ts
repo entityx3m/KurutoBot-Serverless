@@ -92,14 +92,20 @@ export default {
         
         const playerData = await response.json();
         
-        const embed = {
+        const embed: any = {
           title: `👤 ${playerData.name} (#${playerTag})`,
           color: 0x5865F2,
           thumbnail: playerData.league?.iconUrls?.medium ? { url: playerData.league.iconUrls.medium } : undefined,
           fields: [
             { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
             { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
-            { name: "🏆 League", value: playerData.league?.name || "Unranked", inline: true },
+            { 
+              name: "🏆 League", 
+              value: playerData.leagueTier ? 
+                `${playerData.leagueTier.name}${playerData.league ? ` (${playerData.league.name})` : ''}` : 
+                "Unranked", 
+              inline: true 
+            },
             { name: "⚔️ War Stars", value: playerData.warStars?.toString() || "0", inline: true },
             { name: "🎯 Trophies", value: playerData.trophies?.toString() || "0", inline: true },
             { name: "🏆 Best Trophies", value: playerData.bestTrophies?.toString() || "0", inline: true },
@@ -107,6 +113,22 @@ export default {
           footer: { text: "Player Lookup" },
           timestamp: new Date().toISOString()
         };
+        
+        if (playerData.warPreference) {
+          embed.fields.push({ 
+            name: "⚔️ War Preference", 
+            value: playerData.warPreference === "in" ? "Opted In ✅" : "Opted Out ❌", 
+            inline: true 
+          });
+        }
+        
+        if (playerData.role) {
+          embed.fields.push({ 
+            name: "👑 Clan Role", 
+            value: playerData.role.charAt(0).toUpperCase() + playerData.role.slice(1), 
+            inline: true 
+          });
+        }
         
         if (playerData.clan) {
           embed.fields.push({ 
@@ -117,6 +139,7 @@ export default {
         }
         
         return {
+            content: "",
           embeds: [embed],
         };
         

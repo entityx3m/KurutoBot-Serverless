@@ -61,18 +61,42 @@ export default {
       };
     }
 
-    // If no tag provided, show accounts
+    // If no tag provided, show accounts with unlink buttons
     if (!rawPlayerTag) {
       let accountList = "**📋 Your Linked Accounts:**\n\n";
+      
+      // Create buttons for each account
+      const components = [];
+      const actionRow = {
+        type: 1,
+        components: [] as any[]
+      };
+      
       userData.accounts.forEach((account, index) => {
         const isMain = account.isMain ? " ⭐" : "";
         accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
+        
+        // Add button for each account (max 5 per row, Discord limit)
+        if (index < 5) {
+          actionRow.components.push({
+            type: 2,
+            style: 2, // SECONDARY
+            custom_id: `unlink_account:${account.playerTag}`,
+            label: `${index + 1}. ${account.playerName.slice(0, 10)}${account.playerName.length > 10 ? '...' : ''}`,
+            emoji: account.isMain ? { name: "⭐" } : undefined
+          });
+        }
       });
       
-      accountList += `\nTo unlink an account: \`/unlink player_tag:#TAG\``;
+      if (actionRow.components.length > 0) {
+        components.push(actionRow);
+      }
+      
+      accountList += `\n**Click a button above to unlink that account**\nOr type: \`/unlink player_tag:#TAG\``;
       
       return {
         content: accountList,
+        components: components,
         flags: MessageFlags.Ephemeral,
       };
     }
