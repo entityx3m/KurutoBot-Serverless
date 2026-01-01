@@ -12,7 +12,7 @@ import {
   type SimplifiedInteraction,
 } from "./utils/types";
 import { RecruitmentTracker } from "./utils/recruitment";
-import { getKV, setKV } from "./utils/kvHelper";
+import { getKV, setKV, getUserData, setUserData } from "./utils/kvHelper";
 
 const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
 const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
@@ -74,6 +74,8 @@ async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelRes
       );
       return res.status(200).end();
     }
+
+ 
     
     // Extract player tag from modal
     let playerTag = '';
@@ -400,6 +402,253 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } catch (error) {
           logger.error("Failed to open modal", { error });
           return res.status(500).json({ error: "Failed to open modal" });
+        }
+      }
+
+      // NEW: manage_accounts, set_main, select_account handlers
+      if (customId === "manage_accounts") {
+        try {
+          const userId = message.member?.user?.id;
+          if (!userId) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ Could not identify user.",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          // Show a simple message for now (you can expand this)
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+            {
+              type: InteractionResponseType.ChannelMessageWithSource,
+              data: {
+                content: "📋 Use `/player` command to view and manage your linked accounts!",
+                flags: MessageFlags.Ephemeral,
+              },
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          return res.status(200).end();
+
+        } catch (error) {
+          logger.error("Failed to handle manage_accounts:", error);
+          return res.status(500).end();
+        }
+      }
+
+      if (typeof customId === "string" && customId.startsWith("set_main:")) {
+        try {
+          const playerTag = customId.replace("set_main:", "");
+          const userId = message.member?.user?.id;
+
+          if (!userId) {
+            await axios.post(
+              `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+              {
+                type: InteractionResponseType.ChannelMessageWithSource,
+                data: {
+                  content: "❌ Could not identify user.",
+                  flags: MessageFlags.Ephemeral,
+                },
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          // Defer the response
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+            {
+              type: InteractionResponseType.DeferredMessageUpdate,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+
+          // Update main account logic
+          const userData = await getUserData(userId);
+          if (!userData) {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: "❌ No user data found.",
+                flags: MessageFlags.Ephemeral,
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          // Find and update main account
+          let found = false;
+          for (const account of userData.accounts) {
+            if (account.playerTag === playerTag) {
+              account.isMain = true;
+              found = true;
+            } else {
+              account.isMain = false;
+            }
+          }
+
+          if (!found) {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: `❌ Account #${playerTag} not found in your linked accounts.`,
+                flags: MessageFlags.Ephemeral,
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          userData.mainAccountTag = playerTag;
+          userData.lastUpdated = new Date().toISOString();
+
+          // Update nickname
+          const mainAccount = userData.accounts.find(acc => acc.isMain);
+          if (mainAccount) {
+            const guildId = message.guild_id;
+            if (guildId) {
+              try {
+                const nickname = `${mainAccount.playerName} | TH${mainAccount.townHallLevel}`;
+                await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ nick: nickname }),
+                });
+                userData.nickname = nickname;
+              } catch (nicknameError) {
+                console.warn('Failed to update nickname:', nicknameError);
+              }
+            }
+          }
+
+          await setUserData(userId, userData);
+
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+            {
+              content: `✅ **Main Account Updated!**\n\n⭐ **${mainAccount?.playerName}** (#${playerTag}) is now your main account.\n\nYour nickname has been updated.`,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+
+          return res.status(200).end();
+
+        } catch (error) {
+          logger.error("Failed to set main account:", error);
+          return res.status(500).end();
+        }
+      }
+
+      // Handle select_account dropdown
+      if (customId === "select_account") {
+        try {
+          const selectedTag = message.data?.values?.[0];
+          const userId = message.member?.user?.id;
+
+          if (!selectedTag || !userId) {
+            return res.status(400).end();
+          }
+
+          // Defer the response
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+            {
+              type: InteractionResponseType.DeferredMessageUpdate,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+
+          // Fetch fresh data for selected account
+          const response = await fetch(`${COC_API_BASE_URL}/players/%23${selectedTag}`, {
+            headers: { 
+              'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
+              'Accept': 'application/json' 
+            },
+          });
+
+          if (!response.ok) {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: `❌ Failed to fetch data for account #${selectedTag}`,
+                flags: MessageFlags.Ephemeral,
+              },
+              { headers: { "Content-Type": "application/json" } }
+            );
+            return res.status(200).end();
+          }
+
+          const playerData = await response.json();
+
+          const embed = {
+            title: `👤 ${playerData.name} (#${selectedTag})`,
+            color: 0x5865F2,
+            fields: [
+              { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
+              { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
+              { name: "🏆 League", value: playerData.league?.name || "Unranked", inline: true },
+              { name: "⚔️ War Stars", value: playerData.warStars?.toString() || "0", inline: true },
+              { name: "🎯 Trophies", value: playerData.trophies?.toString() || "0", inline: true },
+              { name: "🏆 Best Trophies", value: playerData.bestTrophies?.toString() || "0", inline: true },
+            ],
+            footer: { text: "Account selected from dropdown" },
+            timestamp: new Date().toISOString()
+          };
+
+          if (playerData.clan) {
+            embed.fields.push({ 
+              name: "👑 Clan", 
+              value: `${playerData.clan.name} (${playerData.clan.tag})`, 
+              inline: false 
+            });
+          }
+
+          // Get user data to check if this is main account
+          const userData = await getUserData(userId);
+          const isMain = userData?.accounts.find(acc => acc.playerTag === selectedTag)?.isMain || false;
+
+          const components = [];
+          if (!isMain) {
+            components.push({
+              type: 1, // ACTION_ROW
+              components: [{
+                type: 2, // BUTTON
+                style: 1, // PRIMARY
+                custom_id: `set_main:${selectedTag}`,
+                label: "⭐ Set as Main",
+                emoji: { name: "⭐" }
+              }]
+            });
+          }
+
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+            {
+              embeds: [embed],
+              components: components.length > 0 ? components : undefined,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+
+          return res.status(200).end();
+
+        } catch (error) {
+          logger.error("Failed to handle select_account:", error);
+          return res.status(500).end();
         }
       }
       

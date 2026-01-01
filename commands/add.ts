@@ -85,12 +85,7 @@ export default {
         type: ApplicationCommandOptionType.Boolean,
         required: false,
       },
-      {
-        name: "pingclan",
-        description: "Ping the clan role in their general channel?",
-        type: ApplicationCommandOptionType.Boolean,
-        required: false,
-      }
+    
     ]
   } as CommandData,
   async execute(data: {
@@ -129,15 +124,12 @@ export default {
     const forceOption = chatInteraction.data.options?.find(
       (option) => option.name === "force"
     ) as any;
-    const pingClanOption = chatInteraction.data.options?.find(
-      (option) => option.name === "pingclan"
-    ) as any;
 
     const memberId = memberOption?.value;
     const clan = clanOption?.value;
     const rawPlayerTag = playerTagOption?.value;
     const force = forceOption?.value || false;
-    const pingClan = pingClanOption?.value;
+    
 
     // NEW: Check for linked account if no player_tag provided
     let playerTag: string;
@@ -187,8 +179,7 @@ export default {
       };
     }
 
-    // Correct handling of default pingclan value
-    const shouldPingClan = (typeof pingClan === 'boolean') ? pingClan : true;
+    
 
     try {
       // NEW: Verify player tag with CoC API
@@ -377,9 +368,7 @@ export default {
 
       // Announce in clan channel
       try {
-        const content = shouldPingClan
-          ? `<@&${clanInfo.role}> Plz welcome our newest clan member <@${memberId}>! <a:heya:1427561870797180928> — glad to have you on board! <a:KnightCheergif:1427561243811647548>`
-          : `Welcome <@${memberId}> to your clan's general chat! <a:heya:1427561870797180928> — feel free to look around! <a:KnightCheergif:1427561243811647548>`;
+        const content = `Welcome <@${memberId}> to your clan's general chat! <a:heya:1427561870797180928> — feel free to look around! <a:KnightCheergif:1427561243811647548>`;
 
         await fetch(`https://discord.com/api/v10/channels/${clanInfo.channel}/messages`, {
           method: 'POST',

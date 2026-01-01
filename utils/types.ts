@@ -58,6 +58,8 @@ export interface SimplifiedInteraction {
         value?: string;
       }>;
     }>;
+    // NEW: Dropdown/select menu values
+    values?: string[];
   };
   id: string;
   channel_id: string;
