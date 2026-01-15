@@ -480,14 +480,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (customId === "link_coc_account") {
         try {
           const userId = message.member?.user?.id;
+          const guildId = message.guild_id;
           
-          if (!userId) {
+          if (!userId || !guildId) {
             await axios.post(
               `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
               {
                 type: InteractionResponseType.ChannelMessageWithSource,
                 data: {
-                  content: "❌ Could not identify user.",
+                  content: "❌ Could not identify user or guild.",
                   flags: MessageFlags.Ephemeral,
                 },
               },
@@ -496,10 +497,111 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).end();
           }
 
-          // Check if user already has linked accounts
+          // NEW: Check if user already has linked accounts and restore Verified role
           const userData = await getUserData(userId);
           if (userData && userData.accounts.length > 0) {
-            // Show their existing accounts instead of opening modal
+            // Check if user already has Verified role
+            try {
+              const memberResponse = await fetch(
+                `https://discord.com/api/v10/guilds/${guildId}/members/${userId}`,
+                {
+                  headers: {
+                    'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                  },
+                }
+              );
+              
+              if (memberResponse.ok) {
+                const memberData = await memberResponse.json();
+                const hasVerifiedRole = memberData.roles?.includes(VERIFIED_ROLE_ID) || false;
+                
+                // If user doesn't have Verified role, restore it
+                if (!hasVerifiedRole) {
+                  const auditReason = `Restoring Verified role for returning user with ${userData.accounts.length} linked account(s)`;
+                  
+                  await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                      'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                      'Content-Type': 'application/json',
+                      'X-Audit-Log-Reason': auditReason
+                    },
+                  });
+                  
+                  // Also restore nickname if they have a main account
+                  if (userData.mainAccountTag) {
+                    const mainAccount = userData.accounts.find(acc => acc.playerTag === userData.mainAccountTag);
+                    if (mainAccount) {
+                      const nickname = `${mainAccount.playerName} | TH${mainAccount.townHallLevel}`;
+                      await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+                        method: 'PATCH',
+                        headers: {
+                          'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                          'Content-Type': 'application/json',
+                          'X-Audit-Log-Reason': `Restoring nickname from main account ${mainAccount.playerName}`
+                        },
+                        body: JSON.stringify({ nick: nickname }),
+                      });
+                      userData.nickname = nickname;
+                      await setUserData(userId, userData);
+                    }
+                  }
+                  
+                  // Show success message with accounts list
+                  let accountList = "**✅ Welcome Back! Verified Role Restored**\n\n";
+                  accountList += `Your **Verified role** has been restored because you have ${userData.accounts.length} linked CoC account(s).\n\n`;
+                  accountList += "**📋 Your Linked Accounts:**\n";
+                  
+                  userData.accounts.forEach((account, index) => {
+                    const isMain = account.isMain ? " ⭐" : "";
+                    accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
+                  });
+                  
+                  accountList += "\n**You can now create tickets!**";
+                  
+                  await axios.post(
+                    `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+                    {
+                      type: InteractionResponseType.ChannelMessageWithSource,
+                      data: {
+                        content: accountList,
+                        flags: MessageFlags.Ephemeral,
+                      },
+                    },
+                    { headers: { "Content-Type": "application/json" } }
+                  );
+                  return res.status(200).end();
+                } else {
+                  // User already has Verified role, show accounts list
+                  let accountList = "**📋 You already have linked accounts!**\n\n";
+                  
+                  userData.accounts.forEach((account, index) => {
+                    const isMain = account.isMain ? " ⭐" : "";
+                    accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
+                  });
+                  
+                  accountList += "\n**Use `/player` to view your accounts or `/unlink` to remove accounts.**";
+                  
+                  await axios.post(
+                    `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+                    {
+                      type: InteractionResponseType.ChannelMessageWithSource,
+                      data: {
+                        content: accountList,
+                        flags: MessageFlags.Ephemeral,
+                      },
+                    },
+                    { headers: { "Content-Type": "application/json" } }
+                  );
+                  return res.status(200).end();
+                }
+              }
+            } catch (roleError) {
+              console.error("Error checking/restoring role:", roleError);
+              // Continue to show accounts list even if role check fails
+            }
+            
+            // Fallback: Show accounts list if role check/restore failed
             let accountList = "**📋 You already have linked accounts!**\n\n";
             
             userData.accounts.forEach((account, index) => {
@@ -556,8 +658,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
           return res.status(200).end();
         } catch (error) {
-          logger.error("Failed to open modal", { error });
-          return res.status(500).json({ error: "Failed to open modal" });
+          logger.error("Failed to handle link_coc_account button", { error });
+          return res.status(500).json({ error: "Failed to process link account request" });
         }
       }
 
