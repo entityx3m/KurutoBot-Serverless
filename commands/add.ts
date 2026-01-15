@@ -82,20 +82,12 @@ export default {
           { name: "CH (Clash Heros)", value: "CH" }
         ]
       },
-      // UPDATED: Made player_tag optional, added force option
       {
         name: "player_tag",
         description: "Player's Clash of Clans tag (optional if member has linked account)",
         type: ApplicationCommandOptionType.String,
         required: false,
       },
-      {
-        name: "force",
-        description: "Force add even if player is in different clan?",
-        type: ApplicationCommandOptionType.Boolean,
-        required: false,
-      },
-    
     ]
   } as CommandData,
   async execute(data: {
@@ -121,7 +113,7 @@ export default {
 
     const chatInteraction = interaction;
 
-    // Find options (UPDATED: Added force option, made player_tag optional)
+    // Find options
     const memberOption = chatInteraction.data.options?.find(
       (option) => option.name === "member"
     ) as any;
@@ -131,15 +123,10 @@ export default {
     const playerTagOption = chatInteraction.data.options?.find(
       (option) => option.name === "player_tag"
     ) as any;
-    const forceOption = chatInteraction.data.options?.find(
-      (option) => option.name === "force"
-    ) as any;
 
     const memberId = memberOption?.value;
     const clan = clanOption?.value;
     const rawPlayerTag = playerTagOption?.value;
-    const force = forceOption?.value || false;
-    
 
     // Check for linked account if no player_tag provided
     let playerTag: string;
@@ -189,8 +176,6 @@ export default {
       };
     }
 
-    
-
     try {
       // NEW: Verify player tag with CoC API
       const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
@@ -213,25 +198,6 @@ export default {
       const playerData = await response.json();
       const playerName = playerData.name;
       const thLevel = playerData.townHallLevel;
-      
-      // UPDATED: Check if player is in the correct clan (with force option)
-      if (playerData.clan) {
-        const expectedClanTag = clanInfo.tag.replace('#', '');
-        const actualClanTag = playerData.clan.tag.replace('#', '');
-        
-        if (actualClanTag !== expectedClanTag && !force) {
-          return {
-            content: `⚠️ **Clan Mismatch**\nPlayer **${playerName}** is in clan **${playerData.clan.name}**, not **${clanInfo.name}**.\n\n*To proceed anyway, use the \`force\` option:*\n\`/add member:@${memberUser.username} clan:${clan} force:true\``,
-            flags: MessageFlags.Ephemeral,
-          };
-        }
-        
-        if (actualClanTag !== expectedClanTag && force) {
-          // Log the forced addition
-          console.log(`⚠️ Force adding ${playerName} to ${clanInfo.name} despite being in ${playerData.clan.name}`);
-        }
-      }
-
       const guildId = interaction.guild_id;
       const commanderName = interaction.member?.user?.username || "Staff";
       const auditReason = `Accepted into ${clanInfo.name} by ${commanderName}`;

@@ -35,28 +35,18 @@ export default {
     
     try {
       const embed = {
-        title: "<a:rg_blink:1456183866510282762> Link Your Clash of Clans Account",
-        description: "Link your CoC account(s) to get verified and join our clans!\n\n**Click the button below to link your account!**",
+        title: " <a:ClashOfClansLogo:1456185647563018330> Unlock Server Access",
+        description: "To prevent spam, you must link your CoC account to open a ticket.\n\n**1️⃣ Step 1: Link Account**\nClick the button below to verify. This grants you the **Verified Role**.\n\n**2️⃣ Step 2: Open a Ticket**\nOnce verified, the panel above will unlock options for:\n🎟️ **Apply to Join**\n🛡️ **Chat with Staff**",
         color: 0x5865F2,
         fields: [
           {
-            name: "<a:ClashOfClansLogo:1456185647563018330> How to find your Player Tag",
-            value: "1. Open Clash of Clans\n2. Tap your profile\n3. Look for the tag under your name (starts with #)\n4. Copy the entire tag including the # symbol",
-            inline: false
-          },
-          {
-            name: "<a:AnimatedCheck:1427570005750448169> Benefits",
-            value: "• Apply to join our clans\n• Chat with staff in support tickets\n• Get verified member role and status\n• Easily access your CoC account data using `/player` command.",
-            inline: false
-          },
-          {
-            name: "<a:Warning:1456190079830720625> Note",
-            value: "• You can link multiple CoC accounts\n• Your first account becomes your main\n• You can change your main account with `/player` command.\n• Your nickname will be updated to your CoC player name upon verification.",
+            name: "<a:rg_blink:1456183866510282762> Quick Navigation",
+            value: "Verified? [**Click here to Create a Ticket**](https://discord.com/channels/REDACTED_GUILD_ID/REDACTED_CHANNEL_VERIFICATION_ID/1439260029328031776)",
             inline: false
           }
         ],
         footer: {
-          text: "BOOM House • Account Verification"
+          text: "BOOM House • Verification System"
         }
       };
       
