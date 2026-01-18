@@ -9,7 +9,6 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-import { kv } from '@vercel/kv';
 import { 
   getUserData, 
   setUserData, 
@@ -21,7 +20,7 @@ import {
 
 // Guild ID check constant
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
-const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1"; // NEW: Added CoC API URL
+const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
 const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
 
 // Role & Channel IDs
@@ -32,6 +31,7 @@ const IDS = {
     LE: 'REDACTED_LE_ID',
     ZP: 'REDACTED_ZP_ID',
     CH: 'REDACTED_CH_ID',
+    SP: 'REDACTED_SP_ID', // NEW: SP Member Role
     VISITOR: 'REDACTED_VISITOR_ID'
   },
   CHANNELS: {
@@ -39,6 +39,7 @@ const IDS = {
     LE: 'REDACTED_CHANNEL_LE_ID',
     ZP: 'REDACTED_CHANNEL_ZP_ID',
     CH: 'REDACTED_CHANNEL_CH_ID',
+    SP: 'REDACTED_CHANNEL_SP_ID', // NEW: SP General Channel
     CLANS_LIST: 'REDACTED_CHANNEL_CLANS_LIST_ID',
     ATTACK_PLANNING: 'REDACTED_CHANNEL_ATTACK_PLANNING_ID',
     FUN_CATEGORY: 'REDACTED_CHANNEL_FUN_CATEGORY_ID',
@@ -49,12 +50,13 @@ const IDS = {
   }
 };
 
-// UPDATED: Added abbr and tag fields
+// UPDATED: Added SP to clan map
 const CLAN_MAP = {
   WM: { role: IDS.ROLES.WM, channel: IDS.CHANNELS.WM, name: 'WAR MASTER', abbr: 'WM', tag: 'REDACTED_WM_CLAN_TAG' },
   LE: { role: IDS.ROLES.LE, channel: IDS.CHANNELS.LE, name: 'LEGENDS', abbr: 'LE', tag: 'REDACTED_LE_CLAN_TAG' },
   ZP: { role: IDS.ROLES.ZP, channel: IDS.CHANNELS.ZP, name: 'ZwartePiet', abbr: 'ZP', tag: 'REDACTED_ZP_CLAN_TAG' },
-  CH: { role: IDS.ROLES.CH, channel: IDS.CHANNELS.CH, name: 'Clash Heros', abbr: 'CH', tag: 'REDACTED_CH_CLAN_TAG' }
+  CH: { role: IDS.ROLES.CH, channel: IDS.CHANNELS.CH, name: 'Clash Heros', abbr: 'CH', tag: 'REDACTED_CH_CLAN_TAG' },
+  SP: { role: IDS.ROLES.SP, channel: IDS.CHANNELS.SP, name: 'SP.OPS.DIVISION', abbr: 'SP', tag: 'REDACTED_SP_CLAN_TAG' }
 };
 
 export default {
@@ -79,7 +81,8 @@ export default {
           { name: "WM (War Master)", value: "WM" },
           { name: "LE (LEGENDS)", value: "LE" },
           { name: "ZP (ZwartePiet)", value: "ZP" },
-          { name: "CH (Clash Heros)", value: "CH" }
+          { name: "CH (Clash Heros)", value: "CH" },
+          { name: "SP (SP.OPS.DIVISION)", value: "SP" }
         ]
       },
       {
@@ -177,7 +180,7 @@ export default {
     }
 
     try {
-      // NEW: Verify player tag with CoC API
+      // Verify player tag with CoC API
       const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
         headers: { 
           'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
