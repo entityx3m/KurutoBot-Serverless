@@ -1,13 +1,16 @@
 // commands/unlink.ts
+import axios from "axios";
 import {
   ApplicationCommandOptionType,
   ApplicationCommandType,
+  InteractionResponseType,
   MessageFlags,
 } from "discord-api-types/v10";
 import type {
   CommandData,
   CommandExecuteResult,
   SimplifiedInteraction,
+  ComponentHandler,
 } from "../utils/types";
 import { getUserData, setUserData } from "../utils/kvHelper";
 
@@ -212,5 +215,162 @@ export default {
       content: responseText,
       flags: MessageFlags.Ephemeral,
     };
+  },
+
+  // Button handler for unlink account button
+  handlers: {
+    "unlink_account": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+      const [playerTag, buttonUserId] = args; // "unlink_account:TAG:userId"
+      const userId = interaction.member?.user?.id;
+
+      // Verify the user clicking the button is the account owner
+      if (userId !== buttonUserId) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> This button is not for you.",
+              flags: MessageFlags.Ephemeral,
+            },
+          }
+        );
+        return;
+      }
+
+      // Defer the response
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+          type: InteractionResponseType.DeferredMessageUpdate,
+        }
+      );
+
+      try {
+        // Get user data
+        let userData = await getUserData(userId);
+        if (!userData) {
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+            {
+              content: "<a:redcross:1439044567415521443> No user data found.",
+              flags: MessageFlags.Ephemeral,
+            }
+          );
+          return;
+        }
+
+        // Find account to unlink
+        const accountIndex = userData.accounts.findIndex(acc => acc.playerTag === playerTag);
+        if (accountIndex === -1) {
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+            {
+              content: `<a:redcross:1439044567415521443> Account #${playerTag} not found.`,
+              flags: MessageFlags.Ephemeral,
+            }
+          );
+          return;
+        }
+
+        const accountToRemove = userData.accounts[accountIndex];
+        const isMainAccount = accountToRemove.isMain;
+        const isOnlyAccount = userData.accounts.length === 1;
+        const guildId = interaction.guild_id!;
+
+        // Remove the account
+        userData.accounts.splice(accountIndex, 1);
+        userData.lastUpdated = new Date().toISOString();
+
+        // Handle main account reassignment if needed
+        if (isMainAccount && userData.accounts.length > 0) {
+          userData.accounts[0].isMain = true;
+          userData.mainAccountTag = userData.accounts[0].playerTag;
+          
+          // Update nickname
+          const newMain = userData.accounts[0];
+          try {
+            const nickname = `${newMain.playerName} | TH${newMain.townHallLevel}`;
+            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ nick: nickname }),
+            });
+            userData.nickname = nickname;
+          } catch (nicknameError) {
+            console.warn('Failed to update nickname:', nicknameError);
+          }
+        } else if (isOnlyAccount) {
+          userData.mainAccountTag = undefined;
+          userData.nickname = undefined;
+          
+          // Remove nickname
+          try {
+            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ nick: null }),
+            });
+          } catch (nicknameError) {
+            console.warn('Failed to remove nickname:', nicknameError);
+          }
+          
+          // Remove Verified role
+          try {
+            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+            });
+          } catch (roleError) {
+            console.warn('Failed to remove Verified role:', roleError);
+          }
+        }
+
+        // Save updated data
+        await setUserData(userId, userData);
+
+        // Build response
+        let responseText = `<a:AnimatedCheck:1427570005750448169> **Account Unlinked Successfully!**\n\n` +
+          `**👤 Account:** ${accountToRemove.playerName}\n` +
+          `**🏷️ Player Tag:** #${accountToRemove.playerTag}\n\n`;
+        
+        if (isMainAccount && userData.accounts.length > 0) {
+          const newMain = userData.accounts[0];
+          responseText += `⭐ **New main account:** ${newMain.playerName} (#${newMain.playerTag})\n`;
+        }
+        
+        if (isOnlyAccount) {
+          responseText += `📝 **No accounts remaining.** Verified role and nickname removed.\n`;
+        } else {
+          responseText += `📊 **Remaining accounts:** ${userData.accounts.length}`;
+        }
+
+        // Update the message
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          {
+            content: responseText,
+          }
+        );
+      } catch (error) {
+        console.error('Failed to unlink account:', error);
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          {
+            content: `<a:redcross:1439044567415521443> **Unlink Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
+            flags: MessageFlags.Ephemeral,
+          }
+        );
+      }
+    },
   },
 };
