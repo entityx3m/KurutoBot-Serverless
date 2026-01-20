@@ -16,6 +16,137 @@ import axios from "axios";
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
 
+// Helper function to render player stats with secure component IDs
+async function renderPlayerStats(
+  playerTag: string,
+  userData: any,
+  isSelf: boolean,
+  ownerId: string
+) {
+  // Fetch fresh API data
+  let playerData = userData.accounts.find((acc: any) => acc.playerTag === playerTag) as any;
+  
+  try {
+    const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.COC_API_KEY}`,
+        'Accept': 'application/json'
+      },
+    });
+    if (response.ok) {
+      playerData = await response.json();
+    }
+  } catch (error) {
+    console.warn("Failed to fetch fresh data:", error);
+  }
+
+  const titlePrefix = isSelf ? "Your" : "Their";
+  const mainAccount = userData.accounts.find((acc: any) => acc.isMain) || userData.accounts[0];
+  
+  const embed: any = {
+    title: `📊 ${titlePrefix} Player Stats`,
+    color: 0x5865F2,
+    thumbnail: playerData.leagueTier?.iconUrls?.large ? { url: playerData.leagueTier.iconUrls.large } : undefined,
+    fields: [
+      { name: "👤 CoC Name", value: playerData.name || mainAccount.playerName, inline: true },
+      { name: "🏷️ Player Tag", value: `#${playerTag}`, inline: true },
+      { name: "⭐ Status", value: mainAccount.playerTag === playerTag ? "Main Account" : "Linked Account", inline: true },
+      { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel || mainAccount.townHallLevel}`, inline: true },
+      { name: "📊 Experience", value: `Level ${playerData.expLevel || mainAccount.expLevel}`, inline: true },
+      { name: "🏆 League", value: playerData.leagueTier?.name || mainAccount.leagueTier || "Unranked", inline: true },
+    ],
+    footer: {
+      text: isSelf
+        ? `You have ${userData.accounts.length} linked account${userData.accounts.length > 1 ? 's' : ''}`
+        : `${userData.accounts.length} account${userData.accounts.length > 1 ? 's' : ''}`
+    },
+    timestamp: new Date().toISOString()
+  };
+
+  if (playerData.clan || mainAccount.clan) {
+    const clan = playerData.clan || mainAccount.clan;
+    embed.fields.push({
+      name: "👑 Current Clan",
+      value: `${clan?.name} (${clan?.tag})`,
+      inline: false
+    });
+  }
+
+  if (userData.clan) {
+    const clanMap = {
+      WM: "WAR MASTER",
+      LE: "LEGENDS",
+      ZP: "ZwartePiet",
+      CH: "Clash Heros",
+      SP: "SP.OPS.DIVISION"
+    };
+
+    embed.fields.push({
+      name: "🏰 BOOM House",
+      value: `${clanMap[userData.clan as keyof typeof clanMap] || userData.clan}`,
+      inline: false
+    });
+  }
+
+  if (userData.recruitedAt) {
+    const date = new Date(userData.recruitedAt).toLocaleDateString();
+    embed.fields.push({
+      name: "📅 Joined BOOM",
+      value: date,
+      inline: true
+    });
+  }
+
+  if (userData.recruitedBy) {
+    embed.fields.push({
+      name: "👤 Recruited By",
+      value: `<@${userData.recruitedBy}>`,
+      inline: true
+    });
+  }
+
+  const components = [];
+
+  // Only show buttons if the user is viewing their own profile (isSelf)
+  if (userData.accounts.length > 1 && isSelf) {
+    const options = userData.accounts.map((acc: any) => ({
+      label: `${acc.playerName} (TH${acc.townHallLevel})`,
+      value: acc.playerTag,
+      default: acc.playerTag === playerTag,
+      emoji: acc.isMain ? { name: "⭐" } : undefined
+    }));
+
+    components.push({
+      type: 1,
+      components: [{
+        type: 3, // String Select
+        // SECURE: Embed the ownerId into the custom_id
+        custom_id: `select_account:${ownerId}`,
+        placeholder: "Select an account to view",
+        options: options.slice(0, 25)
+      }]
+    });
+
+    const currentAccount = userData.accounts.find((acc: any) => acc.playerTag === playerTag);
+    if (currentAccount && !currentAccount.isMain) {
+      components.push({
+        type: 1,
+        components: [{
+          type: 2,
+          style: 1,
+          // SECURE: Embed the ownerId into the custom_id
+          custom_id: `set_main:${playerTag}:${ownerId}`,
+          label: "Set as Main Account",
+          emoji: { name: "⭐" }
+        }]
+      });
+    }
+  }
+
+  // Response flags: Ephemeral if looking at someone else, Public if looking at self
+  return { embeds: [embed], components, flags: isSelf ? undefined : MessageFlags.Ephemeral };
+}
+
 export default {
   data: {
     name: "player",
@@ -242,57 +373,31 @@ export default {
       });
     }
     
-    // Create dropdown for account selection (if multiple accounts)
-    let components = [];
-    
-    if (userData.accounts.length > 1 && isSelf) {
-      // Create dropdown options
-      const options = userData.accounts.map((account, index) => ({
-        label: `${account.playerName} | TH${account.townHallLevel}${account.isMain ? ' ⭐' : ''}`,
-        value: account.playerTag,
-        description: `#${account.playerTag}`,
-        default: account.isMain
-      }));
-      
-      components.push({
-        type: 1, // ACTION_ROW
-        components: [{
-          type: 3, // SELECT_MENU
-          custom_id: "select_account",
-          placeholder: "Select an account to view",
-          options: options.slice(0, 25) // Discord limit
-        }]
-      });
-      
-      // Add "Set as Main" button for non-main accounts
-      if (!mainAccount.isMain) {
-        components.push({
-          type: 1, // ACTION_ROW
-          components: [{
-            type: 2, // BUTTON
-            style: 1, // PRIMARY
-            custom_id: `set_main:${mainAccount.playerTag}`,
-            label: "Set as Main",
-            emoji: { name: "⭐" }
-          }]
-        });
-      }
-    }
-    
-    return {
-      content: "",
-      embeds: [embed],
-      components: components.length > 0 ? components : undefined,
-      flags: isSelf ? undefined : MessageFlags.Ephemeral,
-    };
+    return await renderPlayerStats(mainAccount.playerTag, userData, isSelf, targetUserId);
   },
 
   // 2. Handlers for Dropdown & Button
   handlers: {
-    // Handle Account Selection Dropdown
-    "select_account": async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+    // Handle Account Selection Dropdown - SECURE: Verify ownerId
+    "select_account": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+      const [ownerId] = args; // SECURE: Extract ownerId from custom_id
       const selectedTag = interaction.data?.values?.[0];
       const userId = interaction.member?.user?.id;
+
+      // SECURITY CHECK: Verify that the user clicking the button owns this profile
+      if (userId !== ownerId) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> This button is not for you.",
+              flags: MessageFlags.Ephemeral
+            }
+          }
+        );
+        return;
+      }
 
       if (!selectedTag || !userId) {
         return;
@@ -364,7 +469,7 @@ export default {
             components: [{
               type: 2, // BUTTON
               style: 1, // PRIMARY
-              custom_id: `set_main:${selectedTag}`,
+              custom_id: `set_main:${selectedTag}:${ownerId}`, // SECURE: Embed ownerId
               label: "Set as Main",
               emoji: { name: "⭐" }
             }]
@@ -384,10 +489,25 @@ export default {
       }
     },
 
-    // Handle "Set as Main" Button
+    // Handle "Set as Main" Button - SECURE: Verify ownerId
     "set_main": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
-      const [selectedTag] = args; // "set_main:TAG"
+      const [selectedTag, ownerId] = args; // SECURE: Extract ownerId from custom_id (set_main:TAG:OWNER_ID)
       const userId = interaction.member?.user?.id;
+
+      // SECURITY CHECK: Verify that the user clicking the button owns this profile
+      if (userId !== ownerId) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> This button is not for you.",
+              flags: MessageFlags.Ephemeral
+            }
+          }
+        );
+        return;
+      }
 
       if (!selectedTag || !userId) {
         return;

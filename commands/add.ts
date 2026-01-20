@@ -141,9 +141,29 @@ export default {
       try {
         const mainAccount = await getMainAccount(memberId);
         if (!mainAccount) {
+          // No linked account - offer force add option
           return {
-            content: `<a:redcross:1439044567415521443> **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in <#${IDS.CHANNELS.VERIFICATION_CHANNEL}> channel\n• Use /link \n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
+            content: `⚠️ **No Linked Account Found**\n\n<@${memberId}> has not linked their Clash of Clans account.\n\n**If you proceed:**\n• Nickname will **NOT** be updated automatically.\n• "Verified" role will **NOT** be assigned.\n• You must handle these manually.\n\nDo you want to force add them anyway?`,
             flags: MessageFlags.Ephemeral,
+            components: [
+              {
+                type: 1, 
+                components: [
+                  {
+                    type: 2, 
+                    style: 3, // SUCCESS (Green)
+                    custom_id: `force_add_confirm:${memberId}:${clan}`,
+                    label: "✅ Proceed Anyway",
+                  },
+                  {
+                    type: 2, 
+                    style: 4, // DANGER (Red)
+                    custom_id: "force_add_cancel",
+                    label: "❌ Cancel",
+                  }
+                ]
+              }
+            ]
           };
         }
         playerTag = mainAccount.playerTag;
