@@ -1,7 +1,8 @@
-// commands/player.ts
+﻿// commands/player.ts
 import {
   ApplicationCommandOptionType,
   ApplicationCommandType,
+  InteractionResponseType,
   MessageFlags,
 } from "discord-api-types/v10";
 import type {
@@ -10,6 +11,7 @@ import type {
   SimplifiedInteraction,
 } from "../utils/types";
 import { getUserData, setUserData } from "../utils/kvHelper";
+import axios from "axios";
 
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
@@ -34,6 +36,8 @@ export default {
       }
     ]
   } as CommandData,
+
+  // 1. Main Command
   async execute(data: {
     interaction: SimplifiedInteraction;
   }): Promise<CommandExecuteResult> {
@@ -41,7 +45,7 @@ export default {
 
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "❌ This command only works in the BOOM House server!",
+        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -54,7 +58,7 @@ export default {
     const targetUserId = (userOption?.value || interaction.member?.user?.id) as string | undefined;
     if (!targetUserId) {
       return {
-        content: "❌ Could not identify the target user.",
+        content: "<a:redcross:1439044567415521443> Could not identify the target user.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -66,7 +70,7 @@ export default {
     
     if (!targetUser) {
       return {
-        content: "❌ Could not find the specified user.",
+        content: "<a:redcross:1439044567415521443> Could not find the specified user.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -82,30 +86,24 @@ export default {
             'Accept': 'application/json' 
           },
         });
-        
+
         if (!response.ok) {
           return {
-            content: `❌ **Player Not Found**\nTag **#${playerTag}** not found.`,
+            content: `<a:redcross:1439044567415521443> **Player Not Found**\nTag **#${playerTag}** not found.`,
             flags: MessageFlags.Ephemeral,
           };
         }
-        
+
         const playerData = await response.json();
         
-        const embed: any = {
+        const embed = {
           title: `👤 ${playerData.name} (#${playerTag})`,
           color: 0x5865F2,
           thumbnail: playerData.leagueTier?.iconUrls?.large ? { url: playerData.leagueTier.iconUrls.large } : undefined,
           fields: [
             { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
             { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
-            { 
-              name: "🏆 League", 
-              value: playerData.leagueTier ? 
-                `${playerData.leagueTier.name}${playerData.leagueTier ? ` (${playerData.leagueTier.name})` : ''}` : 
-                "Unranked", 
-              inline: true 
-            },
+            { name: "🏆 League", value: playerData.leagueTier?.name || "Unranked", inline: true },
             { name: "⚔️ War Stars", value: playerData.warStars?.toString() || "0", inline: true },
             { name: "🎯 Trophies", value: playerData.trophies?.toString() || "0", inline: true },
             { name: "🏆 Best Trophies", value: playerData.bestTrophies?.toString() || "0", inline: true },
@@ -113,61 +111,59 @@ export default {
           footer: { text: "Player Lookup" },
           timestamp: new Date().toISOString()
         };
-        
+
         if (playerData.warPreference) {
-          embed.fields.push({ 
-            name: "⚔️ War Preference", 
-            value: playerData.warPreference === "in" ? "Opted In ✅" : "Opted Out ❌", 
-            inline: true 
+          embed.fields.push({
+            name: "⚔️ War Preference",
+            value: playerData.warPreference === "in" ? "Opted In <a:AnimatedCheck:1427570005750448169>" : "Opted Out <a:redcross:1439044567415521443>",
+            inline: true
           });
         }
-        
+
         if (playerData.role) {
-          embed.fields.push({ 
-            name: "👑 Clan Role", 
-            value: playerData.role.charAt(0).toUpperCase() + playerData.role.slice(1), 
-            inline: true 
+          embed.fields.push({
+            name: "👑 Clan Role",
+            value: playerData.role.charAt(0).toUpperCase() + playerData.role.slice(1),
+            inline: true
           });
         }
-        
+
         if (playerData.clan) {
-          embed.fields.push({ 
-            name: "👑 Clan", 
-            value: `${playerData.clan.name} (${playerData.clan.tag})`, 
-            inline: false 
+          embed.fields.push({
+            name: "👑 Clan",
+            value: `${playerData.clan.name} (${playerData.clan.tag})`,
+            inline: false
           });
         }
-        
+
         return {
-            content: "",
-          embeds: [embed],
+          content: "",
+          embeds: [embed]
         };
-        
-      } catch (error: any) {
+      } catch (error) {
         return {
-          content: `❌ **Lookup Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
+          content: `<a:redcross:1439044567415521443> **Lookup Failed**\n${error instanceof Error ? error.message : "Unknown error"}`,
           flags: MessageFlags.Ephemeral,
         };
       }
     }
-    
-    // CASE 2: Viewing user's linked accounts
+
+    // CASE 2: Looking up user's linked accounts
     const userData = await getUserData(targetUserId);
     if (!userData || userData.accounts.length === 0) {
       const isSelf = targetUserId === interaction.member?.user?.id;
       const userMention = isSelf ? "You don't" : `<@${targetUserId}> doesn't`;
-      
       return {
         content: `${userMention} have any linked CoC accounts.\nUse \`/link\` to link an account.`,
         flags: MessageFlags.Ephemeral,
       };
     }
+
+    const mainAccount = userData.accounts.find((acc) => acc.isMain) || userData.accounts[0];
+    const isSelf = targetUserId === interaction.member?.user?.id;
     
-    // Show user's main account first
-    const mainAccount = userData.accounts.find(acc => acc.isMain) || userData.accounts[0];
-    
-    // Fetch fresh data for main account
-    let freshData;
+    // Fetch fresh API data
+    let playerData = mainAccount as any;
     try {
       const response = await fetch(`${COC_API_BASE_URL}/players/%23${mainAccount.playerTag}`, {
         headers: { 
@@ -175,19 +171,15 @@ export default {
           'Accept': 'application/json' 
         },
       });
-      
       if (response.ok) {
-        freshData = await response.json();
+        playerData = await response.json();
       }
     } catch (error) {
-      console.warn('Failed to fetch fresh data:', error);
+      console.warn("Failed to fetch fresh data:", error);
     }
-    
-    const playerData = freshData || mainAccount;
-    const isSelf = targetUserId === interaction.member?.user?.id;
+
     const titlePrefix = isSelf ? "Your" : `${targetUser.username}'s`;
-    
-    const embed = {
+    const embed: any = {
       title: `📊 ${titlePrefix} Player Stats`,
       color: 0x5865F2,
       thumbnail: playerData.leagueTier?.iconUrls?.large ? { url: playerData.leagueTier.iconUrls.large } : undefined,
@@ -199,7 +191,7 @@ export default {
         { name: "📊 Experience", value: `Level ${playerData.expLevel || mainAccount.expLevel}`, inline: true },
         { name: "🏆 League", value: playerData.leagueTier?.name || mainAccount.leagueTier || "Unranked", inline: true },
       ],
-      footer: { 
+      footer: {
         text: isSelf 
           ? `You have ${userData.accounts.length} linked account${userData.accounts.length > 1 ? 's' : ''}` 
           : `${targetUser.username} has ${userData.accounts.length} linked account${userData.accounts.length > 1 ? 's' : ''}` 
@@ -211,7 +203,7 @@ export default {
       const clan = playerData.clan || mainAccount.clan;
       embed.fields.push({ 
         name: "👑 Current Clan", 
-        value: `${clan.name} (${clan.tag})`, 
+        value: `${clan?.name} (${clan?.tag})`, 
         inline: false 
       });
     }
@@ -222,7 +214,8 @@ export default {
         WM: "WAR MASTER",
         LE: "LEGENDS", 
         ZP: "ZwartePiet",
-        CH: "Clash Heros"
+        CH: "Clash Heros",
+        SP: "SP.OPS.DIVISION"
       };
       
       embed.fields.push({ 
@@ -279,7 +272,7 @@ export default {
             type: 2, // BUTTON
             style: 1, // PRIMARY
             custom_id: `set_main:${mainAccount.playerTag}`,
-            label: "⭐ Set as Main",
+            label: "Set as Main",
             emoji: { name: "⭐" }
           }]
         });
@@ -293,4 +286,195 @@ export default {
       flags: isSelf ? undefined : MessageFlags.Ephemeral,
     };
   },
+
+  // 2. Handlers for Dropdown & Button
+  handlers: {
+    // Handle Account Selection Dropdown
+    "select_account": async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      const selectedTag = interaction.data?.values?.[0];
+      const userId = interaction.member?.user?.id;
+
+      if (!selectedTag || !userId) {
+        return;
+      }
+
+      // Defer the response
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+          type: InteractionResponseType.DeferredChannelMessageWithSource,
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      try {
+        // Fetch fresh data for selected account
+        const response = await fetch(`${COC_API_BASE_URL}/players/%23${selectedTag}`, {
+          headers: { 
+            'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
+            'Accept': 'application/json' 
+          },
+        });
+
+        if (!response.ok) {
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+            {
+              content: `<a:redcross:1439044567415521443> Failed to fetch data for account #${selectedTag}`,
+              flags: MessageFlags.Ephemeral,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          return;
+        }
+
+        const playerData = await response.json();
+
+        const embed = {
+          title: `👤 ${playerData.name} (#${selectedTag})`,
+          color: 0x5865F2,
+          fields: [
+            { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel}`, inline: true },
+            { name: "📊 Experience", value: `Level ${playerData.expLevel}`, inline: true },
+            { name: "🏆 League", value: playerData.leagueTier?.name || "Unranked", inline: true },
+            { name: "⚔️ War Stars", value: playerData.warStars?.toString() || "0", inline: true },
+            { name: "🎯 Trophies", value: playerData.trophies?.toString() || "0", inline: true },
+            { name: "🏆 Best Trophies", value: playerData.bestTrophies?.toString() || "0", inline: true },
+          ],
+          footer: { text: "Account selected from dropdown" },
+          timestamp: new Date().toISOString()
+        };
+
+        if (playerData.clan) {
+          embed.fields.push({ 
+            name: "👑 Clan", 
+            value: `${playerData.clan.name} (${playerData.clan.tag})`, 
+            inline: false 
+          });
+        }
+
+        // Get user data to check if this is main account
+        const userData = await getUserData(userId);
+        const isMain = userData?.accounts.find(acc => acc.playerTag === selectedTag)?.isMain || false;
+
+        const components = [];
+        if (!isMain) {
+          components.push({
+            type: 1, // ACTION_ROW
+            components: [{
+              type: 2, // BUTTON
+              style: 1, // PRIMARY
+              custom_id: `set_main:${selectedTag}`,
+              label: "Set as Main",
+              emoji: { name: "⭐" }
+            }]
+          });
+        }
+
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          {
+            embeds: [embed],
+            components: components.length > 0 ? components : undefined,
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error("Failed to handle select_account:", error);
+      }
+    },
+
+    // Handle "Set as Main" Button
+    "set_main": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+      const [selectedTag] = args; // "set_main:TAG"
+      const userId = interaction.member?.user?.id;
+
+      if (!selectedTag || !userId) {
+        return;
+      }
+
+      // Defer the response
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+          type: InteractionResponseType.DeferredMessageUpdate,
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      try {
+        // Get user data
+        let userData = await getUserData(userId);
+        if (!userData) {
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+            {
+              content: "<a:redcross:1439044567415521443> No user data found.",
+              flags: MessageFlags.Ephemeral,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          return;
+        }
+
+        // Update main account logic
+        let found = false;
+        for (const account of userData.accounts) {
+          if (account.playerTag === selectedTag) {
+            account.isMain = true;
+            found = true;
+          } else {
+            account.isMain = false;
+          }
+        }
+
+        if (!found) {
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+            {
+              content: `<a:redcross:1439044567415521443> Account #${selectedTag} not found in your linked accounts.`,
+              flags: MessageFlags.Ephemeral,
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          return;
+        }
+
+        userData.mainAccountTag = selectedTag;
+        userData.lastUpdated = new Date().toISOString();
+
+        // Update nickname
+        const guildId = interaction.guild_id;
+        const mainAccount = userData.accounts.find(acc => acc.isMain);
+        if (mainAccount && guildId) {
+          try {
+            const nickname = `${mainAccount.playerName} | TH${mainAccount.townHallLevel}`;
+            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ nick: nickname }),
+            });
+            userData.nickname = nickname;
+          } catch (nicknameError) {
+            console.warn('Failed to update nickname:', nicknameError);
+          }
+        }
+
+        await setUserData(userId, userData);
+
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          {
+            content: `<a:AnimatedCheck:1427570005750448169> **Main Account Updated!**\n\n⭐ **${mainAccount?.playerName}** (#${selectedTag}) is now your main account.\n\nYour nickname has been updated.`,
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error("Failed to set main account:", error);
+      }
+    }
+  }
 };

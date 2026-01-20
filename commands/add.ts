@@ -1,6 +1,8 @@
+import axios from "axios";
 import {
   ApplicationCommandOptionType,
   ApplicationCommandType,
+  InteractionResponseType,
   MessageFlags,
   PermissionFlagsBits,
 } from "discord-api-types/v10";
@@ -8,6 +10,7 @@ import type {
   CommandData,
   CommandExecuteResult,
   SimplifiedInteraction,
+  ComponentHandler,
 } from "../utils/types";
 import { 
   getUserData, 
@@ -101,7 +104,7 @@ export default {
     // Check if command is being used in the correct server
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "❌ This command only works in the BOOM House server!",
+        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -139,14 +142,14 @@ export default {
         const mainAccount = await getMainAccount(memberId);
         if (!mainAccount) {
           return {
-            content: `❌ **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in <#${IDS.CHANNELS.VERIFICATION_CHANNEL}> channel\n• Use /link \n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
+            content: `<a:redcross:1439044567415521443> **No Linked Account**\n<@${memberId}> has not linked their CoC account yet.\n\nEither:\n• Ask them to click the "Link Account" button in <#${IDS.CHANNELS.VERIFICATION_CHANNEL}> channel\n• Use /link \n• Or manually provide their player tag: \`/add member:@user clan:XX player_tag:#TAG\``,
             flags: MessageFlags.Ephemeral,
           };
         }
         playerTag = mainAccount.playerTag;
       } catch (error) {
         return {
-          content: "❌ Failed to check for linked account. Please provide player_tag manually.",
+          content: "<a:redcross:1439044567415521443> Failed to check for linked account. Please provide player_tag manually.",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -155,7 +158,7 @@ export default {
       playerTag = rawPlayerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (!playerTag || !/^[A-Z0-9]{3,15}$/.test(playerTag)) {
         return {
-          content: "❌ **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+          content: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -191,7 +194,7 @@ export default {
       if (!response.ok) {
         if (response.status === 404) {
           return {
-            content: `❌ **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
+            content: `<a:redcross:1439044567415521443> **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
             flags: MessageFlags.Ephemeral,
           };
         }
@@ -225,7 +228,7 @@ export default {
         const existingUserId = await getUserIdByTag(playerTag);
         if (existingUserId && existingUserId !== memberId) {
           return {
-            content: `❌ **Tag Already Used**\nAccount **#${playerTag}** is already linked to another user.`,
+            content: `<a:redcross:1439044567415521443> **Tag Already Used**\nAccount **#${playerTag}** is already linked to another user.`,
             flags: MessageFlags.Ephemeral,
           };
         }
@@ -488,9 +491,149 @@ export default {
       console.error('Error in add command:', error);
       
       return {
-        content: `❌ **Recruitment Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `<a:redcross:1439044567415521443> **Recruitment Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
         flags: MessageFlags.Ephemeral,
       };
     }
+  },
+
+  // Button handlers for force add confirmation
+  handlers: {
+    "force_add_cancel": async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+          type: InteractionResponseType.UpdateMessage,
+          data: {
+            content: "<a:redcross:1439044567415521443> **Force Add Cancelled**",
+            components: [],
+            flags: MessageFlags.Ephemeral,
+          },
+        }
+      );
+    },
+
+    "force_add_confirm": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+      // Parse arguments we packed into the ID: "force_add_confirm:memberId:clan"
+      const [memberId, clan] = args;
+      const guildId = interaction.guild_id!;
+      const executorId = interaction.member?.user?.id;
+
+      // Acknowledge click immediately (Deferred Update)
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        { type: InteractionResponseType.DeferredMessageUpdate }
+      );
+
+      try {
+        const clanInfo = CLAN_MAP[clan as keyof typeof CLAN_MAP];
+        const auditReason = `Force added by ${interaction.member?.user?.username} (No Link)`;
+
+        // 1. Update User Data
+        let userData = await getUserData(memberId);
+        if (!userData) {
+          userData = {
+            discordId: memberId,
+            discordName: "Unknown",
+            accounts: [],
+            lastUpdated: new Date().toISOString(),
+          };
+        }
+        userData.recruitedAt = new Date().toISOString();
+        userData.recruitedBy = executorId;
+        userData.clan = clan;
+        await setUserData(memberId, userData);
+
+        // 2. Assign BOOM Member role
+        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${IDS.ROLES.BOOM_MEMBER}`, {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+            "X-Audit-Log-Reason": auditReason,
+          },
+        });
+
+        // 3. Assign clan role
+        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${clanInfo.role}`, {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+            "X-Audit-Log-Reason": auditReason,
+          },
+        });
+
+        // 4. Remove Visitor role if present
+        try {
+          const memberResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}`, {
+            headers: { "Authorization": `Bot ${process.env.DISCORD_TOKEN}` },
+          });
+          if (memberResponse.ok) {
+            const member = await memberResponse.json();
+            if (member.roles?.includes(IDS.ROLES.VISITOR)) {
+              await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${IDS.ROLES.VISITOR}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bot ${process.env.DISCORD_TOKEN}` },
+              });
+            }
+          }
+        } catch (visitorError) {
+          console.warn("Failed to remove Visitor role:", visitorError);
+        }
+
+        // 5. Send DM
+        try {
+          const dmChannelResponse = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
+            method: "POST",
+            headers: { "Authorization": `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ recipient_id: memberId }),
+          });
+          if (dmChannelResponse.ok) {
+            const dmChannel = await dmChannelResponse.json();
+            await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
+              method: "POST",
+              headers: { "Authorization": `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                content: `Welcome to **${clanInfo.name}** in BOOM House! You've been added to the clan.`,
+              }),
+            });
+          }
+        } catch (dmError) {
+          console.warn("Failed to send DM:", dmError);
+        }
+
+        // 6. Send welcome message to clan channel
+        try {
+          await fetch(`https://discord.com/api/v10/channels/${clanInfo.channel}/messages`, {
+            method: "POST",
+            headers: { "Authorization": `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              content: `Welcome <@${memberId}> to **${clanInfo.name}**! <a:heya:1427561870797180928>`,
+            }),
+          });
+        } catch (channelError) {
+          console.warn("Failed to send clan channel message:", channelError);
+        }
+
+        // 7. Final edit to the confirmation message
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          {
+            content: `<a:AnimatedCheck:1427570005750448169> **Force Add Complete**\n<@${memberId}> added to **${clanInfo.name}**.\n\n⚠️ **Reminder:**\n• Manually update their nickname if needed.\n• Manually verify if needed.`,
+            components: [],
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error("Force add failed:", error);
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          {
+            content: `<a:redcross:1439044567415521443> **Force Add Failed**\n${error instanceof Error ? error.message : "Unknown error"}`,
+            components: [],
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      }
+    },
   },
 };

@@ -1,6 +1,6 @@
-// commands/postrecruit.ts (simplified)
 import {
   ApplicationCommandType,
+  InteractionResponseType,
   MessageFlags,
   PermissionFlagsBits,
 } from "discord-api-types/v10";
@@ -10,6 +10,7 @@ import type {
   SimplifiedInteraction,
 } from "../utils/types";
 import { RecruitmentTracker } from "../utils/recruitment";
+import axios from "axios";
 
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 
@@ -20,27 +21,24 @@ export default {
     type: ApplicationCommandType.ChatInput,
     default_member_permissions: PermissionFlagsBits.ManageMessages.toString(),
   } as CommandData,
+
+  // 1. Main Command: Posts the initial message
   async execute(data: {
     interaction: SimplifiedInteraction;
   }): Promise<CommandExecuteResult> {
     const interaction = data.interaction;
     
-    // BLOCK OTHER SERVERS
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "❌ This command only works in the BOOM House server!",
+        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
     
     try {
-      // Auto-update from CoC API before posting
       await RecruitmentTracker.updateFromAPI();
-      
       const { embed, components } = await createRecruitmentMessage();
 
-      // Return the embed/components as the command response so the bot's
-      // interaction original message can be patched by the refresh handler.
       return {
         content: "",
         embeds: [embed],
@@ -50,14 +48,55 @@ export default {
     } catch (error) {
       console.error("Error posting recruitment:", error);
       return {
-        content: "❌ Failed to post recruitment status 💀",
+        content: "<a:redcross:1439044567415521443> Failed to post recruitment status 💀",
         flags: MessageFlags.Ephemeral,
       };
     }
   },
+
+  // 2. Handlers: Handles the "Refresh" button
+  handlers: {
+    "refresh_recruitment": async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      // Security Check: Ensure it's the right server
+      if (interaction.guild_id !== MAIN_SERVER_ID) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: { content: "<a:redcross:1439044567415521443> Wrong server!", flags: MessageFlags.Ephemeral }
+          }
+        );
+        return;
+      }
+
+      // Acknowledge click immediately (Loading state)
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        { type: InteractionResponseType.DeferredMessageUpdate }
+      );
+
+      try {
+        // Fetch fresh data
+        await RecruitmentTracker.updateFromAPI();
+        const { embed, components } = await createRecruitmentMessage();
+        
+        // Edit the original message
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          {
+            embeds: [embed],
+            components: components
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error("Refresh failed:", error);
+      }
+    }
+  }
 };
 
-// commands/postrecruit.ts (updated with better display)
+// Helper function (Reused by both Execute and Handler)
 async function createRecruitmentMessage() {
   const summary = await RecruitmentTracker.getSummary();
   const { clans, totalMembers, totalCapacity, totalEmptySlots, overallFillPercentage } = summary;
@@ -100,8 +139,8 @@ async function createRecruitmentMessage() {
         {
           type: 2, // BUTTON
           style: 1, // PRIMARY
-          custom_id: "refresh_recruitment",
-          label: "🔄 Refresh",
+          custom_id: "refresh_recruitment", // Matches handler key
+          label: "Refresh",
           emoji: { name: "🔄" }
         }
       ]

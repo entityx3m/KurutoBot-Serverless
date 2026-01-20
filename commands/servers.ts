@@ -24,7 +24,7 @@ export default {
     // Owner check
     if (interaction.member?.user?.id !== OWNER_ID) {
       return {
-        content: "❌ Owner only command 💀",
+        content: "<a:redcross:1439044567415521443> Owner only command 💀",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -44,7 +44,7 @@ export default {
         console.error(`API Error: ${response.status} - ${errorText}`);
         
         return {
-          content: `❌ Failed to fetch servers: ${response.status} ${response.statusText}`,
+          content: `<a:redcross:1439044567415521443> Failed to fetch servers: ${response.status} ${response.statusText}`,
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -123,10 +123,10 @@ export default {
       };
 
     } catch (error: any) {
-      console.error('❌ /servers command error:', error);
+      console.error('<a:redcross:1439044567415521443> /servers command error:', error);
       
       return {
-        content: `❌ Error: ${error.message || 'Unknown error'}`,
+        content: `<a:redcross:1439044567415521443> Error: ${error.message || 'Unknown error'}`,
         flags: MessageFlags.Ephemeral,
       };
     }

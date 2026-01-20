@@ -19,7 +19,7 @@ async function cleanupRecruitmentData() {
     console.log('✅ New recruitment structure initialized');
     
   } catch (error) {
-    console.error('❌ Cleanup failed:', error);
+    console.error('<a:redcross:1439044567415521443> Cleanup failed:', error);
   }
 }
 

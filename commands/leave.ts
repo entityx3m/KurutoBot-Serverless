@@ -58,7 +58,7 @@ export default {
 
       if (response.status === 204) {
         return {
-          content: `✅ Left server \`${serverId}\`\nGood riddance 💀`,
+          content: `<a:AnimatedCheck:1427570005750448169> Left server \`${serverId}\`\nGood riddance 💀`,
           flags: MessageFlags.Ephemeral,
         };
       } else if (response.status === 404) {

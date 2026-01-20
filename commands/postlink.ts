@@ -28,7 +28,7 @@ export default {
     // BLOCK OTHER SERVERS
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "❌ This command only works in the BOOM House server!",
+        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -93,7 +93,7 @@ export default {
     } catch (error) {
       console.error("Error posting link embed:", error);
       return {
-        content: "❌ Failed to post linking embed",
+        content: "<a:redcross:1439044567415521443> Failed to post linking embed",
         flags: MessageFlags.Ephemeral,
       };
     }

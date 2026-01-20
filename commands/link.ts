@@ -2,15 +2,17 @@
 import {
   ApplicationCommandOptionType,
   ApplicationCommandType,
+  InteractionResponseType,
   MessageFlags,
   PermissionFlagsBits,
 } from "discord-api-types/v10";
+import axios from "axios";
 import type {
   CommandData,
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-import { getUserData, setUserData, type UserData, type PlayerAccount } from "../utils/kvHelper";
+import { getUserData, setUserData, getUserIdByTag, linkTagToUser, type UserData, type PlayerAccount } from "../utils/kvHelper";
 
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
@@ -44,7 +46,7 @@ export default {
 
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "❌ This command only works in the BOOM House server!",
+        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -56,7 +58,7 @@ export default {
     const rawPlayerTag = playerTagOption?.value;
     if (typeof rawPlayerTag !== "string" || !rawPlayerTag) {
       return {
-        content: "❌ Missing player tag.",
+        content: "<a:redcross:1439044567415521443> Missing player tag.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -64,7 +66,7 @@ export default {
     
     if (!targetUserId) {
       return {
-        content: "❌ Could not identify target user.",
+        content: "<a:redcross:1439044567415521443> Could not identify target user.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -76,7 +78,7 @@ export default {
     
     if (!targetUser) {
       return {
-        content: "❌ Could not find the specified user.",
+        content: "<a:redcross:1439044567415521443> Could not find the specified user.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -85,7 +87,7 @@ export default {
     const playerTag = rawPlayerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!/^[A-Z0-9]{3,15}$/.test(playerTag)) {
       return {
-        content: "❌ **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+        content: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -102,7 +104,7 @@ export default {
       if (!response.ok) {
         if (response.status === 404) {
           return {
-            content: `❌ **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
+            content: `<a:redcross:1439044567415521443> **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
             flags: MessageFlags.Ephemeral,
           };
         }
@@ -137,7 +139,7 @@ export default {
       const existingAccount = userData.accounts.find(acc => acc.playerTag === playerTag);
       if (existingAccount) {
         return {
-          content: `❌ **Already Linked**\nThis account (#${playerTag}) is already linked to <@${targetUserId}>.`,
+          content: `<a:redcross:1439044567415521443> **Already Linked**\nThis account (#${playerTag}) is already linked to <@${targetUserId}>.`,
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -212,7 +214,7 @@ export default {
       const mention = linkedByOthers ? `<@${targetUserId}> ` : '';
       const linkedByText = linkedByOthers ? ` (linked by <@${interaction.member?.user?.id}>)` : '';
       
-      let responseText = `${mention}✅ **Account Successfully Linked!**${linkedByText}\n\n` +
+      let responseText = `${mention}<a:AnimatedCheck:1427570005750448169> **Account Successfully Linked!**${linkedByText}\n\n` +
         `**👤 CoC Account:** ${playerName}\n` +
         `**🏷️ Player Tag:** #${playerTag}\n` +
         `**🏰 Town Hall:** Level ${thLevel}\n` +
@@ -241,9 +243,346 @@ export default {
     } catch (error: any) {
       console.error('Error in link command:', error);
       return {
-        content: `❌ **Linking Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `<a:redcross:1439044567415521443> **Linking Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
         flags: MessageFlags.Ephemeral,
       };
     }
+  },
+
+  // Handlers for button and modal interactions
+  handlers: {
+    // 1. Button: "Link Account" - Opens modal
+    "link_coc_account": async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      const userId = interaction.member?.user?.id;
+      const guildId = interaction.guild_id;
+
+      if (!userId || !guildId) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> Could not identify user or guild.",
+              flags: MessageFlags.Ephemeral,
+            },
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        return;
+      }
+
+      // Check if user already has linked accounts
+      const userData = await getUserData(userId);
+      if (userData && userData.accounts.length > 0) {
+        // Show accounts list instead of link modal
+        let accountList = "**📋 You already have linked accounts!**\n\n";
+        userData.accounts.forEach((account, index) => {
+          const isMain = account.isMain ? " ⭐" : "";
+          accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
+        });
+        accountList += "\n**Use `/player` to view your accounts or `/unlink` to remove accounts.**";
+
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: accountList,
+              flags: MessageFlags.Ephemeral,
+            },
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        return;
+      }
+
+      // Open the link modal
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+          type: InteractionResponseType.Modal,
+          data: {
+            custom_id: "link_coc_account_modal",
+            title: "Link Clash of Clans Account",
+            components: [
+              {
+                type: 1,
+                components: [
+                  {
+                    type: 4, // TEXT_INPUT
+                    custom_id: "player_tag_input",
+                    label: "Your Player Tag",
+                    style: 1, // SHORT
+                    placeholder: "#ABC123 or ABC123",
+                    min_length: 3,
+                    max_length: 15,
+                    required: true,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+    },
+
+    // 2. Modal: "Link CoC Account Modal" - Process linking
+    "link_coc_account_modal": async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      const userId = interaction.member?.user?.id;
+      const guildId = interaction.guild_id;
+      const components = interaction.data?.components || [];
+
+      if (!userId || !guildId) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> Failed to identify user or guild",
+              flags: MessageFlags.Ephemeral,
+            },
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        return;
+      }
+
+      // Extract player tag from modal
+      let playerTag = "";
+      components.forEach((row: any) => {
+        row.components.forEach((component: any) => {
+          if (component.custom_id === "player_tag_input") {
+            playerTag = component.value || "";
+          }
+        });
+      });
+
+      // Validate player tag
+      playerTag = playerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (!/^[A-Z0-9]{3,15}$/.test(playerTag)) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+              flags: MessageFlags.Ephemeral,
+            },
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        return;
+      }
+
+      // Check if tag is already linked
+      const existingUserId = await getUserIdByTag(playerTag);
+      if (existingUserId) {
+        const existingUser = await getUserData(existingUserId);
+        const isSelf = existingUserId === userId;
+        const errorMessage = isSelf
+          ? `<a:redcross:1439044567415521443> **Already Linked**\nYou already have account **#${playerTag}** linked to your profile.`
+          : `<a:redcross:1439044567415521443> **Tag Already Used**\nAccount **#${playerTag}** is already linked to another user.`;
+
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: errorMessage,
+              flags: MessageFlags.Ephemeral,
+            },
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        return;
+      }
+
+      // Verify player tag with CoC API
+      try {
+        const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
+          headers: {
+            Authorization: `Bearer ${process.env.COC_API_KEY}`,
+            Accept: "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          await axios.post(
+            `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+            {
+              type: InteractionResponseType.ChannelMessageWithSource,
+              data: {
+                content: `<a:redcross:1439044567415521443> **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
+                flags: MessageFlags.Ephemeral,
+              },
+            },
+            { headers: { "Content-Type": "application/json" } }
+          );
+          return;
+        }
+
+        const playerData = await response.json();
+        const playerName = playerData.name;
+        const thLevel = playerData.townHallLevel;
+        const expLevel = playerData.expLevel;
+        const leagueTier = playerData.leagueTier
+          ? {
+              name: playerData.leagueTier.name,
+              iconUrls: playerData.leagueTier.iconUrls,
+            }
+          : undefined;
+        const clan = playerData.clan
+          ? {
+              tag: playerData.clan.tag,
+              name: playerData.clan.name,
+            }
+          : undefined;
+        const role = playerData.role;
+        const warPreference = playerData.warPreference;
+
+        // Get or create user data
+        let userData = await getUserData(userId);
+        const isFirstAccount = !userData || userData.accounts.length === 0;
+
+        if (!userData) {
+          userData = {
+            discordId: userId,
+            discordName: interaction.member?.user?.username || "Unknown",
+            accounts: [],
+            lastUpdated: new Date().toISOString(),
+          };
+        }
+
+        // Create new account
+        const newAccount: PlayerAccount = {
+          playerTag,
+          playerName,
+          townHallLevel: thLevel,
+          expLevel,
+          leagueTier,
+          clan,
+          role,
+          warPreference,
+          isMain: isFirstAccount,
+          linkedAt: new Date().toISOString(),
+          linkedBy: userId,
+        };
+
+        // Add account
+        userData.accounts.push(newAccount);
+
+        // If this is the first account, set as main
+        if (isFirstAccount) {
+          userData.mainAccountTag = playerTag;
+        }
+
+        // Save user data
+        await setUserData(userId, userData);
+        await linkTagToUser(playerTag, userId);
+
+        // Assign Verified role if first account
+        if (isFirstAccount) {
+          const auditReason = `CoC account linked via /link - ${playerName} (#${playerTag})`;
+
+          try {
+            await fetch(
+              `https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`,
+              {
+                method: "PUT",
+                headers: {
+                  Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
+                  "Content-Type": "application/json",
+                  "X-Audit-Log-Reason": auditReason,
+                },
+              }
+            );
+          } catch (roleError) {
+            console.warn("Failed to assign Verified role:", roleError);
+          }
+
+          // Set nickname for main account
+          if (newAccount.isMain) {
+            try {
+              const nickname = `${playerName} | TH${thLevel}`;
+              await fetch(
+                `https://discord.com/api/v10/guilds/${guildId}/members/${userId}`,
+                {
+                  method: "PATCH",
+                  headers: {
+                    Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
+                    "Content-Type": "application/json",
+                    "X-Audit-Log-Reason": `Nickname set from main account ${playerName}`,
+                  },
+                  body: JSON.stringify({ nick: nickname }),
+                }
+              );
+              userData.nickname = nickname;
+              await setUserData(userId, userData);
+            } catch (nicknameError) {
+              console.warn("Failed to set nickname:", nicknameError);
+            }
+          }
+        }
+
+        // Send success response
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              embeds: [
+                {
+                  title: "<a:AnimatedCheck:1427570005750448169> Account Successfully Linked!",
+                  description: `Your Discord account has been linked to your Clash of Clans account.`,
+                  color: 0x00ff00,
+                  fields: [
+                    { name: "👤 CoC Name", value: playerName, inline: true },
+                    { name: "🏷️ Player Tag", value: `#${playerTag}`, inline: true },
+                    { name: "🏰 Town Hall", value: `Level ${thLevel}`, inline: true },
+                    {
+                      name: "📊 Experience",
+                      value: `Level ${expLevel}`,
+                      inline: true,
+                    },
+                    {
+                      name: "🏆 League",
+                      value: leagueTier?.name || "Unranked",
+                      inline: true,
+                    },
+                    {
+                      name: "⚔️ War Pref",
+                      value:
+                        warPreference === "in" ? "Opted In" : "Opted Out",
+                      inline: true,
+                    },
+                  ],
+                  footer: {
+                    text: isFirstAccount
+                      ? "You can now apply to join our clans!"
+                      : "Use /player to manage your accounts",
+                  },
+                },
+              ],
+              flags: MessageFlags.Ephemeral,
+            },
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error("Modal handling error:", error);
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> An error occurred while processing your request.",
+              flags: MessageFlags.Ephemeral,
+            },
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+      }
+    },
   },
 };

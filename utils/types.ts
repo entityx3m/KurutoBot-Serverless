@@ -86,17 +86,23 @@ export interface SimplifiedInteraction {
 }
 
 export type CommandExecuteUnpromised = {
-  content: string;
+  content?: string;
   embeds?: any[];
   components?: any[];
   flags?: MessageFlags;
 };
 
-export type CommandExecuteResult = Promise<CommandExecuteUnpromised>;
+export type CommandExecuteResult = Promise<CommandExecuteUnpromised | void>;
 
 export type CommandExecute = (data: {
   interaction: SimplifiedInteraction;
 }) => CommandExecuteResult;
+
+// Handler function type for buttons/modals
+export type ComponentHandler = (data: {
+  interaction: SimplifiedInteraction;
+  args: string[]; // Arguments parsed from custom_id (e.g., ["memberId", "clan"])
+}) => Promise<void>;
 
 export type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
   initialEphemeral?: boolean | undefined;
@@ -105,4 +111,7 @@ export type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
 export interface Command {
   data: CommandData;
   execute: CommandExecute;
+  // Dictionary of handlers
+  // Key = custom_id prefix (e.g., "force_add_confirm")
+  handlers?: Record<string, ComponentHandler>;
 }

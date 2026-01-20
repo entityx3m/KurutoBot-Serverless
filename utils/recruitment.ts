@@ -62,7 +62,7 @@ export class RecruitmentTracker {
         console.log('✅ Recruitment tracker updated with new clans');
       }
     } catch (error) {
-      console.error('❌ Failed to initialize recruitment tracker:', error);
+      console.error('<a:redcross:1439044567415521443> Failed to initialize recruitment tracker:', error);
     }
   }
 
@@ -108,7 +108,7 @@ export class RecruitmentTracker {
         }
       }
     } catch (error) {
-      console.error('❌ Failed to update from API:', error);
+      console.error('<a:redcross:1439044567415521443> Failed to update from API:', error);
     }
   }
 
@@ -117,7 +117,7 @@ export class RecruitmentTracker {
       const data = await kv.hget<ClanRecruitment>(this.KEY, clan.toUpperCase());
       return data;
     } catch (error) {
-      console.error(`❌ Failed to get clan ${clan}:`, error);
+      console.error(`<a:redcross:1439044567415521443> Failed to get clan ${clan}:`, error);
       return null;
     }
   }
@@ -134,7 +134,7 @@ export class RecruitmentTracker {
           }) 
         : [];
     } catch (error) {
-      console.error('❌ Failed to get all clans:', error);
+      console.error('<a:redcross:1439044567415521443> Failed to get all clans:', error);
       return [];
     }
   }

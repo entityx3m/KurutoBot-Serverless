@@ -50,7 +50,7 @@ async function cleanupCommandScope(url) {
     });
 
     if (!response.ok) {
-      console.log(`❌ No commands found or access denied at: ${url}`);
+      console.log(`<a:redcross:1439044567415521443> No commands found or access denied at: ${url}`);
       return;
     }
 
@@ -69,7 +69,7 @@ async function cleanupCommandScope(url) {
       if (deleteResponse.ok) {
         console.log(`✅ Deleted: ${command.name} (${command.id})`);
       } else {
-        console.log(`❌ Failed to delete: ${command.name}`);
+        console.log(`<a:redcross:1439044567415521443> Failed to delete: ${command.name}`);
       }
     }
   } catch (error) {
