@@ -584,5 +584,59 @@ export default {
         );
       }
     },
+
+    // Handle "My Accounts" Button - Show user's linked accounts
+    "manage_accounts": async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      const userId = interaction.member?.user?.id;
+
+      if (!userId) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> Could not identify user.",
+              flags: MessageFlags.Ephemeral,
+            },
+          }
+        );
+        return;
+      }
+
+      const userData = await getUserData(userId);
+      if (!userData || userData.accounts.length === 0) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:redcross:1439044567415521443> You don't have any linked CoC accounts yet.\n\nClick **Link Account** to add your first account!",
+              flags: MessageFlags.Ephemeral,
+            },
+          }
+        );
+        return;
+      }
+
+      // Build account list
+      let accountList = "**📋 Your Linked Accounts:**\n\n";
+      userData.accounts.forEach((account, index) => {
+        const isMain = account.isMain ? " ⭐" : "";
+        accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
+      });
+
+      accountList += `\n**Use \`/player\` to view details or \`/unlink\` to remove accounts.**`;
+
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+          type: InteractionResponseType.ChannelMessageWithSource,
+          data: {
+            content: accountList,
+            flags: MessageFlags.Ephemeral,
+          },
+        }
+      );
+    },
   },
 };
