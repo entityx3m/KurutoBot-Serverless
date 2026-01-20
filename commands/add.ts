@@ -48,7 +48,7 @@ const IDS = {
     FUN_CATEGORY: 'REDACTED_CHANNEL_FUN_CATEGORY_ID',
     CWL_SIGNUPS: 'REDACTED_CHANNEL_CWL_SIGNUPS_ID',
     BASE_VAULT: 'REDACTED_CHANNEL_BASE_VAULT_ID',
-    SHOWCASE_BASE: 'REDACTED_CHANNEL_SHOWCASE_BASE_ID',
+    SHOWCASE_BASE: '1423638902278852650',
     VERIFICATION_CHANNEL: 'REDACTED_CHANNEL_VERIFICATION_ID'
   }
 };
@@ -142,8 +142,11 @@ export default {
         const mainAccount = await getMainAccount(memberId);
         if (!mainAccount) {
           // No linked account - offer force add option
+          // Get the ID of the staff member running the command
+          const executorId = interaction.member?.user?.id;
+
           return {
-            content: `⚠️ **No Linked Account Found**\n\n<@${memberId}> has not linked their Clash of Clans account.\n\n**If you proceed:**\n• Nickname will **NOT** be updated automatically.\n• "Verified" role will **NOT** be assigned.\n• You must handle these manually.\n\nDo you want to force add them anyway?`,
+            content: `<a:red_warning:1463226880630198476> **No Linked Account Found**\n\n<@${memberId}> has not linked their Clash of Clans account.\n\n**If you proceed:**\n• Nickname will **NOT** be updated automatically.\n• "Verified" role will **NOT** be assigned.\n• You must handle these manually.\n\nDo you want to force add them anyway?`,
             flags: MessageFlags.Ephemeral,
             components: [
               {
@@ -152,14 +155,18 @@ export default {
                   {
                     type: 2, 
                     style: 3, // SUCCESS (Green)
-                    custom_id: `force_add_confirm:${memberId}:${clan}`,
-                    label: "✅ Proceed Anyway",
+                    // SECURE: Add executorId to the custom_id
+                    custom_id: `force_add_confirm:${memberId}:${clan}:${executorId}`,
+                    label: "Proceed Anyway",
+                    emoji: { name: "✅" },
                   },
                   {
                     type: 2, 
                     style: 4, // DANGER (Red)
-                    custom_id: "force_add_cancel",
-                    label: "❌ Cancel",
+                    // SECURE: Add executorId to the custom_id
+                    custom_id: `force_add_cancel:${executorId}`,
+                    label: "Cancel",
+                    emoji: { name: "❌" },
                   }
                 ]
               }
@@ -519,27 +526,57 @@ export default {
 
   // Button handlers for force add confirmation
   handlers: {
-    "force_add_cancel": async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+    "force_add_cancel": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+      const [executorId] = args; 
+
+      // SECURITY CHECK: Verify if the clicker is the original command runner
+      if (interaction.member?.user?.id !== executorId) {
+        // FIX: Explicitly tell Discord this is unauthorized
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: { 
+              content: "<a:Warning:1456190079830720625> This button is not for you.", 
+              flags: MessageFlags.Ephemeral 
+            }
+          }
+        );
+        return;
+      }
+
+      // Proceed if authorized
       await axios.post(
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
         {
           type: InteractionResponseType.UpdateMessage,
-          data: {
-            content: "<a:redcross:1439044567415521443> **Force Add Cancelled**",
-            components: [],
-            flags: MessageFlags.Ephemeral,
-          },
+          data: { content: "<a:redcross:1439044567415521443> **Force Add Cancelled**", components: [], flags: MessageFlags.Ephemeral }
         }
       );
     },
 
     "force_add_confirm": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
-      // Parse arguments we packed into the ID: "force_add_confirm:memberId:clan"
-      const [memberId, clan] = args;
-      const guildId = interaction.guild_id!;
-      const executorId = interaction.member?.user?.id;
+      const [memberId, clan, executorId] = args;
 
-      // Acknowledge click immediately (Deferred Update)
+      // SECURITY CHECK: Verify if the clicker is the original command runner
+      if (interaction.member?.user?.id !== executorId) {
+        // FIX: Explicitly tell Discord this is unauthorized
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: { 
+              content: "<a:Warning:1456190079830720625> This button is not for you.", 
+              flags: MessageFlags.Ephemeral 
+            }
+          }
+        );
+        return;
+      }
+      
+      const guildId = interaction.guild_id!;
+      
+      // Defer Update
       await axios.post(
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
         { type: InteractionResponseType.DeferredMessageUpdate }
@@ -549,22 +586,17 @@ export default {
         const clanInfo = CLAN_MAP[clan as keyof typeof CLAN_MAP];
         const auditReason = `Force added by ${interaction.member?.user?.username} (No Link)`;
 
-        // 1. Update User Data
+        // Update KV
         let userData = await getUserData(memberId);
         if (!userData) {
-          userData = {
-            discordId: memberId,
-            discordName: "Unknown",
-            accounts: [],
-            lastUpdated: new Date().toISOString(),
-          };
+          userData = { discordId: memberId, discordName: "Unknown", accounts: [], lastUpdated: new Date().toISOString() };
         }
         userData.recruitedAt = new Date().toISOString();
-        userData.recruitedBy = executorId;
+        userData.recruitedBy = interaction.member?.user?.id;
         userData.clan = clan;
         await setUserData(memberId, userData);
 
-        // 2. Assign BOOM Member role
+        // Assign BOOM Member role
         await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${IDS.ROLES.BOOM_MEMBER}`, {
           method: "PUT",
           headers: {
@@ -573,7 +605,7 @@ export default {
           },
         });
 
-        // 3. Assign clan role
+        // Assign clan role
         await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${clanInfo.role}`, {
           method: "PUT",
           headers: {
@@ -582,7 +614,7 @@ export default {
           },
         });
 
-        // 4. Remove Visitor role if present
+        // Remove Visitor role if present
         try {
           const memberResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}`, {
             headers: { "Authorization": `Bot ${process.env.DISCORD_TOKEN}` },
@@ -600,7 +632,7 @@ export default {
           console.warn("Failed to remove Visitor role:", visitorError);
         }
 
-        // 5. Send DM
+        // Send DM
         try {
           const dmChannelResponse = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
             method: "POST",
@@ -621,7 +653,7 @@ export default {
           console.warn("Failed to send DM:", dmError);
         }
 
-        // 6. Send welcome message to clan channel
+        // Send welcome message to clan channel
         try {
           await fetch(`https://discord.com/api/v10/channels/${clanInfo.channel}/messages`, {
             method: "POST",
@@ -634,26 +666,24 @@ export default {
           console.warn("Failed to send clan channel message:", channelError);
         }
 
-        // 7. Final edit to the confirmation message
+        // Final Update
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           {
-            content: `<a:AnimatedCheck:1427570005750448169> **Force Add Complete**\n<@${memberId}> added to **${clanInfo.name}**.\n\n⚠️ **Reminder:**\n• Manually update their nickname if needed.\n• Manually verify if needed.`,
-            components: [],
+            content: `<a:AnimatedCheck:1427570005750448169> **Force Add Complete**\n<@${memberId}> added to **${clanInfo.name}**.\n\n<a:red_warning:1463226880630198476> **Reminder:**\n• Manually update their nickname.\n• Manually verify if needed.`,
+            components: []
           },
           { headers: { "Content-Type": "application/json" } }
         );
+
       } catch (error) {
-        console.error("Force add failed:", error);
+        console.error("Force add failed", error);
+        // Optional: Let the user know it failed
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
-          {
-            content: `<a:redcross:1439044567415521443> **Force Add Failed**\n${error instanceof Error ? error.message : "Unknown error"}`,
-            components: [],
-          },
-          { headers: { "Content-Type": "application/json" } }
+          { content: "<a:redcross:1439044567415521443> Force add failed due to an internal error.", components: [] }
         );
       }
-    },
-  },
+    }
+  }
 };
