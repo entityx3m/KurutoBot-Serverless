@@ -20,6 +20,7 @@ import {
   linkTagToUser,
   type PlayerAccount
 } from "../utils/kvHelper";
+import { linkPlayerAccount } from "../utils/linkHelper";
 import {
   IDS,
   CLAN_MAP,
@@ -130,7 +131,7 @@ export default {
                     type: 2, 
                     style: 3, // SUCCESS (Green)
                     // SECURE: Add executorId to the custom_id
-                    custom_id: `force_add_confirm:${memberId}:${clan}:${executorId}`,
+                    custom_id: `add_force_confirm:${memberId}:${clan}:${executorId}`,
                     label: "Proceed Anyway",
                     emoji: { name: "✅" },
                   },
@@ -138,7 +139,7 @@ export default {
                     type: 2, 
                     style: 4, // DANGER (Red)
                     // SECURE: Add executorId to the custom_id
-                    custom_id: `force_add_cancel:${executorId}`,
+                    custom_id: `add_force_cancel:${executorId}`,
                     label: "Cancel",
                     emoji: { name: "❌" },
                   }
@@ -209,66 +210,26 @@ export default {
       const commanderName = interaction.member?.user?.username || "Staff";
       const auditReason = `Accepted into ${clanInfo.name} by ${commanderName}`;
 
-      // Get or create user data for this member
-      let userData = await getUserData(memberId);
-      const isFirstAccount = !userData || userData.accounts.length === 0;
+      // Use linkHelper to link the account
+      const linkResult = await linkPlayerAccount(
+        playerTag,
+        memberId,
+        memberUser.username,
+        interaction.member?.user?.id,
+        guildId,
+        true, // shouldAssignVerifiedRole
+        false // don't set nickname here (we'll set clan-specific one)
+      );
 
-      if (!userData) {
-        userData = {
-          discordId: memberId,
-          discordName: memberUser.username,
-          accounts: [],
-          lastUpdated: new Date().toISOString(),
+      if (!linkResult.success) {
+        return {
+          content: linkResult.message,
+          flags: MessageFlags.Ephemeral,
         };
       }
 
-      // Check if account already linked to this user
-      const existingAccount = userData.accounts.find(acc => acc.playerTag === playerTag);
-      if (!existingAccount) {
-        // Check if tag is already linked to someone else
-        const existingUserId = await getUserIdByTag(playerTag);
-        if (existingUserId && existingUserId !== memberId) {
-          return {
-            content: `<a:redcross:1439044567415521443> **Tag Already Used**\nAccount **#${playerTag}** is already linked to another user.`,
-            flags: MessageFlags.Ephemeral,
-          };
-        }
-        
-        // Create new account record
-        const newAccount: PlayerAccount = {
-          playerTag,
-          playerName,
-          townHallLevel: thLevel,
-          expLevel: playerData.expLevel,
-          leagueTier: playerData.leagueTier ? {
-            name: playerData.leagueTier.name,
-            iconUrls: playerData.leagueTier.iconUrls
-          } : undefined,
-          clan: playerData.clan ? {
-            tag: playerData.clan.tag,
-            name: playerData.clan.name
-          } : undefined,
-          role: playerData.role,
-          warPreference: playerData.warPreference,
-          isMain: isFirstAccount,
-          linkedAt: new Date().toISOString(),
-          linkedBy: interaction.member?.user?.id, // Staff member who added them
-        };
-        
-        // Add account to user data
-        userData.accounts.push(newAccount);
-        
-        // If this is the first account, set as main
-        if (isFirstAccount) {
-          userData.mainAccountTag = playerTag;
-        }
-        
-        // Save user data and create reverse mapping
-        await setUserData(memberId, userData);
-        await linkTagToUser(playerTag, memberId);
-        
-        console.log(`✅ Linked account #${playerTag} to ${memberUser.username} during recruitment`);
-      }
+      const wasNewlyLinked = !linkResult.userData?.accounts.find(acc => acc.playerTag === playerTag);
+      let userData = linkResult.userData!;
 
       // Update recruitment info
       userData.recruitedAt = new Date().toISOString();
@@ -359,7 +320,7 @@ export default {
         memberId,
         clanInfo,
         nickname,
-        !existingAccount,
+        wasNewlyLinked,
         playerName,
         thLevel,
         playerTag,
@@ -384,7 +345,7 @@ export default {
 
   // Button handlers for force add confirmation
   handlers: {
-    "force_add_cancel": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+    "add_force_cancel": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
       const [executorId] = args; 
 
       // SECURITY CHECK: Verify if the clicker is the original command runner
@@ -413,7 +374,7 @@ export default {
       );
     },
 
-    "force_add_confirm": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+    "add_force_confirm": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
       const [memberId, clan, executorId] = args;
 
       // SECURITY CHECK: Verify if the clicker is the original command runner

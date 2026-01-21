@@ -60,37 +60,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       logger.debug("Handling interaction", { custom_id: customId, type: message.type });
 
-      // Loop through all commands to find one that claims this customId
+      // First, try to find an EXACT match across all commands
+      for (const cmdName in commands) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const command = (commands as any)[cmdName] as Command;
+        
+        if (command.handlers && command.handlers[customId]) {
+          try {
+            // For buttons with arguments, parse them
+            const args = customId.includes(':') ? customId.split(":").slice(1) : [];
+            await command.handlers[customId]({ interaction: message, args });
+            return res.status(200).end();
+          } catch (error) {
+            logger.error(`Error in handler ${customId} from command ${cmdName}:`, error);
+            return await handleHandlerError(message, error, res);
+          }
+        }
+      }
+
+      // If no exact match, try prefix matches (for custom IDs with colons like "force_add_confirm:123:WM:456")
       for (const cmdName in commands) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const command = (commands as any)[cmdName] as Command;
         
         if (command.handlers) {
-          // Check if any handler key matches the start of the customId
-          for (const key in command.handlers) {
-            if (customId.startsWith(key)) {
+          for (const handlerKey in command.handlers) {
+            // Only check prefix if customId starts with handlerKey AND has a colon after it
+            // This prevents "link_coc_account_modal" from matching "link_coc_account"
+            if (customId.startsWith(handlerKey + ':') || customId === handlerKey) {
               try {
-                // Extract arguments (e.g. "force_add:123" -> ["123"])
-                // If customId is just "refresh", args will be empty
                 const args = customId.includes(':') ? customId.split(":").slice(1) : [];
-                
-                // Execute the handler defined in the command file
-                await command.handlers[key]({ interaction: message, args });
-                
+                await command.handlers[handlerKey]({ interaction: message, args });
                 return res.status(200).end();
               } catch (error) {
-                logger.error(`Error in handler ${key}:`, error);
-                // Try to warn the user if possible
-                try {
-                   await axios.post(
-                    `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
-                    {
-                      type: InteractionResponseType.ChannelMessageWithSource,
-                      data: { content: " Interaction failed due to an error.", flags: MessageFlags.Ephemeral }
-                    }
-                   );
-                } catch (e) { /* ignore */ }
-                return res.status(200).end();
+                logger.error(`Error in handler ${handlerKey} from command ${cmdName}:`, error);
+                return await handleHandlerError(message, error, res);
               }
             }
           }
@@ -153,4 +157,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     logger.error("Error processing request", { error });
     return res.status(500).json({ error: "Internal Server Error" });
   }
+}
+
+// Helper function for handling errors in component/modal interactions
+async function handleHandlerError(message: SimplifiedInteraction, error: any, res: VercelResponse) {
+  try {
+    await axios.post(
+      `https://discord.com/api/v10/interactions/${message.id}/${message.token}/callback`,
+      {
+        type: InteractionResponseType.ChannelMessageWithSource,
+        data: { 
+          content: "<a:redcross:1439044567415521443> Interaction failed due to an error.", 
+          flags: MessageFlags.Ephemeral 
+        }
+      }
+    );
+  } catch (e) { /* ignore */ }
+  return res.status(200).end();
 }

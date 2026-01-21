@@ -57,14 +57,14 @@ export default {
             {
               type: 2, // BUTTON
               style: 3, // SUCCESS (green)
-              custom_id: "link_coc_account",
+              custom_id: "link_coc_account_btn",
               label: "Link Account",
               emoji: { name: "🔗" }
             },
             {
               type: 2, // BUTTON
               style: 2, // SECONDARY (gray)
-              custom_id: "manage_accounts",
+              custom_id: "manage_accounts_btn",
               label: "My Accounts",
               emoji: { name: "📋" }
             }
