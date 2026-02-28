@@ -391,7 +391,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:redcross:1439044567415521443> This button is not for you.",
+              content: "<a:Warning:1456190079830720625> This button is not for you.",
               flags: MessageFlags.Ephemeral
             }
           }
@@ -501,7 +501,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:redcross:1439044567415521443> This button is not for you.",
+              content: "<a:Warning:1456190079830720625> This button is not for you.",
               flags: MessageFlags.Ephemeral
             }
           }

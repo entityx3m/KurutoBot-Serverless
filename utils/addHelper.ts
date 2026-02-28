@@ -1,103 +1,90 @@
-// 1. DEFINE IDS HERE (Do not import them)
+import { CLANS, CHANNEL_IDS, ROLE_IDS } from "./config";
+import type { ClanInfo } from "./config";
+
+// Re-export for backward compatibility
 export const IDS = {
-  ROLES: {
-    BOOM_MEMBER: 'REDACTED_BOOM_MEMBER_ID',
-    WM: 'REDACTED_WM_ID',
-    LE: 'REDACTED_LE_ID',
-    ZP: 'REDACTED_ZP_ID',
-    CH: 'REDACTED_CH_ID',
-    SP: 'REDACTED_SP_ID',
-    VISITOR: 'REDACTED_VISITOR_ID'
-  },
-  CHANNELS: {
-    WM: 'REDACTED_CHANNEL_WM_ID',
-    LE: 'REDACTED_CHANNEL_LE_ID',
-    ZP: 'REDACTED_CHANNEL_ZP_ID',
-    CH: 'REDACTED_CHANNEL_CH_ID',
-    SP: 'REDACTED_CHANNEL_SP_ID',
-    CLANS_LIST: 'REDACTED_CHANNEL_CLANS_LIST_ID',
-    ATTACK_PLANNING: 'REDACTED_CHANNEL_ATTACK_PLANNING_ID',
-    FUN_CATEGORY: 'REDACTED_CHANNEL_FUN_CATEGORY_ID',
-    CWL_SIGNUPS: 'REDACTED_CHANNEL_CWL_SIGNUPS_ID',
-    BASE_VAULT: 'REDACTED_CHANNEL_BASE_VAULT_ID',
-    SHOWCASE_BASE: 'REDACTED_CHANNEL_SHOWCASE_BASE_ID',
-    VERIFICATION_CHANNEL: 'REDACTED_CHANNEL_VERIFICATION_ID'
-  }
+  ROLES: ROLE_IDS,
+  CHANNELS: CHANNEL_IDS
 };
 
-// 2. DEFINE CLAN MAP HERE
-export const CLAN_MAP = {
-  WM: { role: IDS.ROLES.WM, channel: IDS.CHANNELS.WM, name: 'WAR MASTER', abbr: 'WM', tag: 'REDACTED_WM_CLAN_TAG' },
-  LE: { role: IDS.ROLES.LE, channel: IDS.CHANNELS.LE, name: 'LEGENDS', abbr: 'LE', tag: 'REDACTED_LE_CLAN_TAG' },
-  ZP: { role: IDS.ROLES.ZP, channel: IDS.CHANNELS.ZP, name: 'ZwartePiet', abbr: 'ZP', tag: 'REDACTED_ZP_CLAN_TAG' },
-  CH: { role: IDS.ROLES.CH, channel: IDS.CHANNELS.CH, name: 'Clash Heros', abbr: 'CH', tag: 'REDACTED_CH_CLAN_TAG' },
-  SP: { role: IDS.ROLES.SP, channel: IDS.CHANNELS.SP, name: 'SP.OPS.DIVISION', abbr: 'SP', tag: 'REDACTED_SP_CLAN_TAG' }
-};
+// Create a map compatible with existing code
+export const CLAN_MAP = Object.fromEntries(
+  Object.entries(CLANS).map(([key, clan]) => [
+    key,
+    {
+      role: clan.roleId,
+      channel: clan.channelId,
+      name: clan.name,
+      abbr: clan.abbr,
+      tag: clan.tag
+    }
+  ])
+) as Record<string, any>;
 // Helper function to send welcome DM
 export async function sendWelcomeDM(memberId: string, clanInfo: any): Promise<void> {
   try {
     const dmChannelResponse = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-        'Content-Type': 'application/json',
+        "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ recipient_id: memberId }),
+      body: JSON.stringify({ recipient_id: memberId })
     });
 
     if (dmChannelResponse.ok) {
       const dmChannel = await dmChannelResponse.json();
-      
+
       const dmEmbed = {
         title: `<a:pepopalmas:1409737253130993704> Congratulations! You are now a ${clanInfo.name} Member!`,
-        thumbnail: { 
-          url: 'https://cdn.discordapp.com/attachments/1412097601289064609/1430484430425948270/Picsart_25-10-22_17-08-58-571.png?ex=69179bb1&is=69164a31&hm=85819bb5eb797fc5994da98ff62dfb841885ee87eecf8beb8b4617e47a70dfe1' 
+        thumbnail: {
+          url: "https://cdn.discordapp.com/attachments/1412097601289064609/1430484430425948270/Picsart_25-10-22_17-08-58-571.png?ex=69179bb1&is=69164a31&hm=85819bb5eb797fc5994da98ff62dfb841885ee87eecf8beb8b4617e47a70dfe1"
         },
         description: `Glad to have you in the BOOM House alliance! Here's a quick server tour to get you started.`,
         fields: [
-          { 
-            name: '📜 All Clans', 
-            value: `You can view all our clans in <#${IDS.CHANNELS.CLANS_LIST}>.`, 
-            inline: false 
+          {
+            name: "📜 All Clans",
+            value: `You can view all our clans in <#${CHANNEL_IDS.CLANS_LIST}>.`,
+            inline: false
           },
-          { 
-            name: '⚔️ Attack Planning', 
-            value: `<#${IDS.CHANNELS.ATTACK_PLANNING}> — where attack planners help with strategies and attacks.`, 
-            inline: false 
+          {
+            name: "⚔️ Attack Planning",
+            value: `<#${CHANNEL_IDS.ATTACK_PLANNING}> — where attack planners help with strategies and attacks.`,
+            inline: false
           },
-          { 
-            name: '😀 Clan Fun Stuff', 
-            value: `<#${IDS.CHANNELS.FUN_CATEGORY}> — memes, games, and community activities.`, 
-            inline: false 
+          {
+            name: "😀 Clan Fun Stuff",
+            value: `<#${CHANNEL_IDS.FUN_CATEGORY}> — memes, games, and community activities.`,
+            inline: false
           },
-          { 
-            name: '🏆 CWL Sign-ups', 
-            value: `<#${IDS.CHANNELS.CWL_SIGNUPS}> — sign up your account for CWL. Important for securing a spot.`, 
-            inline: false 
+          {
+            name: "🏆 CWL Sign-ups",
+            value: `<#${CHANNEL_IDS.CWL_SIGNUPS}> — sign up your account for CWL. Important for securing a spot.`,
+            inline: false
           },
-          { 
-            name: '📋 BOOM House Base Vault', 
-            value: `<#${IDS.CHANNELS.BASE_VAULT}> — Access exclusive base layouts including Legend League Bases, Clan War Bases and FindThisBase Bot.`, 
-            inline: false 
+          {
+            name: "📋 BOOM House Base Vault",
+            value: `<#${CHANNEL_IDS.BASE_VAULT}> — Access exclusive base layouts including Legend League Bases, Clan War Bases and FindThisBase Bot.`,
+            inline: false
           },
-          { 
-            name: '🧱 Showcase Base', 
-            value: `<#${IDS.CHANNELS.SHOWCASE_BASE}> — get a **FREE** name-base art as a BOOM member. No need to Pay $1`, 
-            inline: false 
+          {
+            name: "🧱 Showcase Base",
+            value: `<#${CHANNEL_IDS.SHOWCASE_BASE}> — get a **FREE** name-base art as a BOOM member. No need to Pay $1`,
+            inline: false
           }
         ],
-        footer: { 
-          text: 'If you have questions, ask any Staff or visit the General channel.' 
+        footer: {
+          text: "If you have questions, ask any Staff or visit the General channel."
         }
       };
 
       await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-          'Content-Type': 'application/json',
+          "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({ embeds: [dmEmbed] }),
+        body: JSON.stringify({ embeds: [dmEmbed] })
       });
     }
   } catch (dmError) {
@@ -106,68 +93,81 @@ export async function sendWelcomeDM(memberId: string, clanInfo: any): Promise<vo
 }
 
 // Helper function to send clan welcome message
-export async function sendClanWelcome(memberId: string, clanInfo: any): Promise<void> {
+export async function sendClanWelcome(
+  memberId: string,
+  clanInfo: any
+): Promise<void> {
   try {
     const content = `Welcome <@${memberId}> to your clan's general chat! <a:heya:1427561870797180928> — feel free to look around! <a:KnightCheergif:1427561243811647548>`;
 
     await fetch(`https://discord.com/api/v10/channels/${clanInfo.channel}/messages`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-        'Content-Type': 'application/json',
+        "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ content: content }),
+      body: JSON.stringify({ content: content })
     });
   } catch (channelError) {
-    console.error('Failed to send clan channel welcome:', channelError);
+    console.error("Failed to send clan channel welcome:", channelError);
   }
 }
 
 // Helper function to process visitor role
-export async function processVisitorRole(guildId: string, memberId: string, auditReason: string): Promise<string> {
-  let visitorStatus = 'not_present';
-  
+export async function processVisitorRole(
+  guildId: string,
+  memberId: string,
+  auditReason: string
+): Promise<string> {
+  let visitorStatus = "not_present";
+
   try {
-    const fetchMemberResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}`, {
-      headers: { 
-        'Authorization': `Bot ${process.env.DISCORD_TOKEN}` 
-      },
-    });
+    const fetchMemberResponse = await fetch(
+      `https://discord.com/api/v10/guilds/${guildId}/members/${memberId}`,
+      {
+        headers: {
+          "Authorization": `Bot ${process.env.DISCORD_TOKEN}`
+        }
+      }
+    );
 
     if (fetchMemberResponse.ok) {
       const fetchedMember = await fetchMemberResponse.json();
-      const hasVisitorRole = fetchedMember.roles?.includes(IDS.ROLES.VISITOR);
-      
+      const hasVisitorRole = fetchedMember.roles?.includes(ROLE_IDS.VISITOR);
+
       if (hasVisitorRole) {
-        const removeResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${IDS.ROLES.VISITOR}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-            'X-Audit-Log-Reason': auditReason
-          },
-        });
+        const removeResponse = await fetch(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${ROLE_IDS.VISITOR}`,
+          {
+            method: "DELETE",
+            headers: {
+              "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+              "X-Audit-Log-Reason": auditReason
+            }
+          }
+        );
 
         if (removeResponse.ok) {
-          visitorStatus = 'removed';
+          visitorStatus = "removed";
         } else {
-          visitorStatus = 'error';
+          visitorStatus = "error";
         }
       }
     } else {
-      visitorStatus = 'error';
+      visitorStatus = "error";
     }
   } catch (visitorError) {
-    visitorStatus = 'error';
+    visitorStatus = "error";
   }
-  
+
   return visitorStatus;
 }
 
 // Helper function to get visitor message
 export function getVisitorMessage(visitorStatus: string): string {
-  if (visitorStatus === 'removed') {
+  if (visitorStatus === "removed") {
     return `<a:AnimatedCheck:1427570005750448169> Removed **Visitor** role.\n`;
-  } else if (visitorStatus === 'not_present') {
+  } else if (visitorStatus === "not_present") {
     return `<a:redcross:1439044567415521443> **Visitor** role not present.\n`;
   } else {
     return `<a:redcross:1439044567415521443> Could not check/remove **Visitor** role.\n`;
@@ -188,19 +188,21 @@ export function createNormalAddResultContent(
   verifiedAssigned: boolean,
   executorId?: string
 ): string {
-  const linkingStatus = wasNewlyLinked 
+  const linkingStatus = wasNewlyLinked
     ? `<a:AnimatedCheck:1427570005750448169> **Account Linked:** ${playerName} | TH${thLevel} (#${playerTag}) added to their profile\n`
     : `<a:AnimatedCheck:1427570005750448169> **Account Already Linked:** Using existing account ${playerName} | TH${thLevel} (#${playerTag})\n`;
 
-  const verifiedMessage = verifiedAssigned ? `**Verified**, ` : '';
+  const verifiedMessage = verifiedAssigned ? `**Verified**, ` : "";
 
-  return `<a:AnimatedCheck:1427570005750448169> **${memberUsername}** has been accepted into **${clanInfo.name}** by <@${executorId}>.\n` +
+  return (
+    `<a:AnimatedCheck:1427570005750448169> **${memberUsername}** has been accepted into **${clanInfo.name}** by <@${executorId}>.\n` +
     `<a:AnimatedCheck:1427570005750448169> **Nickname set to:** ${nickname}\n` +
     linkingStatus +
     visitorMessage +
     `<a:AnimatedCheck:1427570005750448169> Assigned ${verifiedMessage}**BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
     `<a:AnimatedCheck:1427570005750448169> A welcome DM has been sent. 📩\n` +
-    `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`;
+    `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`
+  );
 }
 
 // Helper function to create result content for force add
@@ -211,12 +213,14 @@ export function createForceAddResultContent(
   visitorMessage: string,
   executorId?: string
 ): string {
-  return `<a:AnimatedCheck:1427570005750448169> **${memberUsername}** has been **force added** into **${clanInfo.name}** by <@${executorId}>.\n` +
+  return (
+    `<a:AnimatedCheck:1427570005750448169> **${memberUsername}** has been **force added** into **${clanInfo.name}** by <@${executorId}>.\n` +
     `<a:red_warning:1463226880630198476> **Manual Actions Required:**\n` +
     `• Update their nickname manually.\n` +
     `• Verify their account manually if needed.\n` +
     visitorMessage +
     `<a:AnimatedCheck:1427570005750448169> Assigned **BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
     `<a:AnimatedCheck:1427570005750448169> A welcome DM has been sent. 📩\n` +
-    `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`;
+    `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`
+  );
 }

@@ -1,9 +1,8 @@
 // utils/linkHelper.ts
 import type { PlayerAccount, UserData } from "./kvHelper";
 import { getUserData, setUserData, getUserIdByTag, linkTagToUser } from "./kvHelper";
-
-const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
-const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
+import { cocApi } from "./cocApi";
+import { VALIDATION, ROLE_IDS, CHANNEL_IDS } from "./config";
 
 export interface LinkAccountResult {
   success: boolean;
@@ -30,13 +29,16 @@ export async function linkPlayerAccount(
 ): Promise<LinkAccountResult> {
   try {
     // Validate player tag
-    const cleanTag = playerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (!/^[A-Z0-9]{3,15}$/.test(cleanTag)) {
+    const validation = VALIDATION.cleanPlayerTag(playerTag);
+    if (!VALIDATION.isValidPlayerTag(validation)) {
       return {
         success: false,
-        message: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
+        message:
+          "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
       };
     }
+
+    const cleanTag = validation;
 
     // Check if tag is already linked to someone else
     const existingUserId = await getUserIdByTag(cleanTag);
@@ -56,12 +58,14 @@ export async function linkPlayerAccount(
         discordId: userId,
         discordName: discordUsername,
         accounts: [],
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
       };
     }
 
     // Check if account already linked to this user
-    const existingAccount = userData.accounts.find(acc => acc.playerTag === cleanTag);
+    const existingAccount = userData.accounts.find(
+      (acc) => acc.playerTag === cleanTag
+    );
     if (existingAccount) {
       return {
         success: true,
@@ -75,24 +79,16 @@ export async function linkPlayerAccount(
     }
 
     // Verify player tag with CoC API
-    const response = await fetch(`${COC_API_BASE_URL}/players/%23${cleanTag}`, {
-      headers: { 
-        'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
-        'Accept': 'application/json' 
-      },
-    });
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        return {
-          success: false,
-          message: `<a:redcross:1439044567415521443> **Player Not Found**\nTag **#${cleanTag}** not found. Check tag or profile privacy.`
-        };
-      }
-      throw new Error(`CoC API error: ${response.status}`);
+    const cocResult = await cocApi.getPlayer(cleanTag);
+
+    if (!cocResult.success) {
+      return {
+        success: false,
+        message: `<a:redcross:1439044567415521443> **Player Not Found**\n${cocResult.message}`
+      };
     }
-    
-    const playerData = await response.json();
+
+    const playerData = cocResult.data;
     const playerName = playerData.name;
     const thLevel = playerData.townHallLevel;
     const expLevel = playerData.expLevel;
@@ -103,50 +99,60 @@ export async function linkPlayerAccount(
       playerName,
       townHallLevel: thLevel,
       expLevel: expLevel,
-      leagueTier: playerData.leagueTier ? {
-        name: playerData.leagueTier.name,
-        iconUrls: playerData.leagueTier.iconUrls
-      } : undefined,
-      clan: playerData.clan ? {
-        tag: playerData.clan.tag,
-        name: playerData.clan.name
-      } : undefined,
+      leagueTier: playerData.leagueTier
+        ? {
+            name: playerData.leagueTier.name,
+            iconUrls: playerData.leagueTier.iconUrls
+          }
+        : undefined,
+      clan: playerData.clan
+        ? {
+            tag: playerData.clan.tag,
+            name: playerData.clan.name
+          }
+        : undefined,
       role: playerData.role,
       warPreference: playerData.warPreference,
       isMain: isFirstAccount,
       linkedAt: new Date().toISOString(),
-      linkedBy: executorId || userId,
+      linkedBy: executorId || userId
     };
-    
+
     // Add account to user data
     userData.accounts.push(newAccount);
-    
+
     // If this is the first account, set as main
     if (isFirstAccount) {
       userData.mainAccountTag = cleanTag;
     }
-    
+
     // Save user data and create reverse mapping
     await setUserData(userId, userData);
     await linkTagToUser(cleanTag, userId);
-    
+
     console.log(`✅ Linked account #${cleanTag} to ${discordUsername}`);
 
     // Assign Verified role if first account and guild ID provided
     if (isFirstAccount && shouldAssignVerifiedRole && guildId) {
       try {
         const auditReason = `CoC account linked - ${playerName} (#${cleanTag})`;
-        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json',
-            'X-Audit-Log-Reason': auditReason
-          },
-        });
+        await fetch(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${ROLE_IDS.VERIFIED}`,
+          {
+            method: "PUT",
+            headers: {
+              "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+              "Content-Type": "application/json",
+              "X-Audit-Log-Reason": auditReason
+            }
+          }
+        );
         console.log(`✅ Assigned Verified role to ${discordUsername}`);
       } catch (roleError) {
-        console.warn(`⚠️ Failed to assign Verified role to ${discordUsername}:`, roleError);
+        console.warn(
+          `⚠️ Failed to assign Verified role to ${discordUsername}:`,
+          roleError
+        );
       }
     }
 
@@ -155,19 +161,24 @@ export async function linkPlayerAccount(
       try {
         const nickname = `${playerName} | TH${thLevel}`;
         await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-          method: 'PATCH',
+          method: "PATCH",
           headers: {
-            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json',
-            'X-Audit-Log-Reason': `Nickname set from main account ${playerName}`
+            "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+            "Content-Type": "application/json",
+            "X-Audit-Log-Reason": `Nickname set from main account ${playerName}`
           },
-          body: JSON.stringify({ nick: nickname }),
+          body: JSON.stringify({ nick: nickname })
         });
         userData.nickname = nickname;
         await setUserData(userId, userData);
-        console.log(`✅ Set nickname for ${discordUsername} to "${nickname}"`);
+        console.log(
+          `✅ Set nickname for ${discordUsername} to "${nickname}"`
+        );
       } catch (nicknameError) {
-        console.warn(`⚠️ Failed to set nickname for ${discordUsername}:`, nicknameError);
+        console.warn(
+          `⚠️ Failed to set nickname for ${discordUsername}:`,
+          nicknameError
+        );
       }
     }
 
@@ -179,12 +190,13 @@ export async function linkPlayerAccount(
       isFirstAccount,
       playerTag: cleanTag
     };
-    
   } catch (error) {
-    console.error('Error in linkPlayerAccount:', error);
+    console.error("Error in linkPlayerAccount:", error);
     return {
       success: false,
-      message: `<a:redcross:1439044567415521443> **Linking Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `<a:redcross:1439044567415521443> **Linking Failed**\n${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
     };
   }
 }
@@ -192,17 +204,22 @@ export async function linkPlayerAccount(
 /**
  * Helper to validate a player tag format
  */
-export function validatePlayerTag(tag: string): { valid: boolean; cleanTag: string; error?: string } {
-  const cleanTag = tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  
-  if (!cleanTag || !/^[A-Z0-9]{3,15}$/.test(cleanTag)) {
+export function validatePlayerTag(tag: string): {
+  valid: boolean;
+  cleanTag: string;
+  error?: string;
+} {
+  const cleanTag = VALIDATION.cleanPlayerTag(tag);
+
+  if (!VALIDATION.isValidPlayerTag(cleanTag)) {
     return {
       valid: false,
       cleanTag,
-      error: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
+      error:
+        "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
     };
   }
-  
+
   return { valid: true, cleanTag };
 }
 
@@ -214,9 +231,9 @@ export async function restoreUserRolesAndNickname(
   userId: string,
   guildId: string,
   discordUsername: string
-): Promise<{ 
-  verifiedRoleAssigned: boolean; 
-  nicknameUpdated: boolean; 
+): Promise<{
+  verifiedRoleAssigned: boolean;
+  nicknameUpdated: boolean;
   mainAccount?: PlayerAccount;
 }> {
   try {
@@ -230,70 +247,87 @@ export async function restoreUserRolesAndNickname(
     let mainAccount: PlayerAccount | undefined;
 
     // Get main account
-    mainAccount = userData.accounts.find(acc => acc.isMain) || userData.accounts[0];
+    mainAccount = userData.accounts.find((acc) => acc.isMain) || userData.accounts[0];
 
     // Check if user already has Verified role
-    const memberResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-      headers: { 
-        'Authorization': `Bot ${process.env.DISCORD_TOKEN}` 
-      },
-    });
+    const memberResponse = await fetch(
+      `https://discord.com/api/v10/guilds/${guildId}/members/${userId}`,
+      {
+        headers: {
+          "Authorization": `Bot ${process.env.DISCORD_TOKEN}`
+        }
+      }
+    );
 
     if (memberResponse.ok) {
       const member = await memberResponse.json();
-      const hasVerifiedRole = member.roles?.includes(VERIFIED_ROLE_ID);
+      const hasVerifiedRole = member.roles?.includes(ROLE_IDS.VERIFIED);
 
       // Assign Verified role if missing
       if (!hasVerifiedRole) {
         try {
           const auditReason = `Restored Verified role for rejoining member with linked CoC account`;
-          await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-              'Content-Type': 'application/json',
-              'X-Audit-Log-Reason': auditReason
-            },
-          });
+          await fetch(
+            `https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${ROLE_IDS.VERIFIED}`,
+            {
+              method: "PUT",
+              headers: {
+                "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+                "Content-Type": "application/json",
+                "X-Audit-Log-Reason": auditReason
+              }
+            }
+          );
           verifiedRoleAssigned = true;
           console.log(`✅ Restored Verified role to ${discordUsername}`);
         } catch (roleError) {
-          console.warn(`⚠️ Failed to restore Verified role to ${discordUsername}:`, roleError);
+          console.warn(
+            `⚠️ Failed to restore Verified role to ${discordUsername}:`,
+            roleError
+          );
         }
       }
 
       // Update nickname if incorrect
       if (mainAccount) {
         const expectedNickname = `${mainAccount.playerName} | TH${mainAccount.townHallLevel}`;
-        const currentNickname = member.nick || member.user.global_name || member.user.username;
-        
+        const currentNickname =
+          member.nick || member.user.global_name || member.user.username;
+
         if (currentNickname !== expectedNickname) {
           try {
             const auditReason = `Restored nickname from linked CoC account: ${mainAccount.playerName}`;
-            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-              method: 'PATCH',
-              headers: {
-                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-                'Content-Type': 'application/json',
-                'X-Audit-Log-Reason': auditReason
-              },
-              body: JSON.stringify({ nick: expectedNickname }),
-            });
+            await fetch(
+              `https://discord.com/api/v10/guilds/${guildId}/members/${userId}`,
+              {
+                method: "PATCH",
+                headers: {
+                  "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
+                  "Content-Type": "application/json",
+                  "X-Audit-Log-Reason": auditReason
+                },
+                body: JSON.stringify({ nick: expectedNickname })
+              }
+            );
             nicknameUpdated = true;
             userData.nickname = expectedNickname;
             await setUserData(userId, userData);
-            console.log(`✅ Restored nickname for ${discordUsername} to "${expectedNickname}"`);
+            console.log(
+              `✅ Restored nickname for ${discordUsername} to "${expectedNickname}"`
+            );
           } catch (nicknameError) {
-            console.warn(`⚠️ Failed to restore nickname for ${discordUsername}:`, nicknameError);
+            console.warn(
+              `⚠️ Failed to restore nickname for ${discordUsername}:`,
+              nicknameError
+            );
           }
         }
       }
     }
 
     return { verifiedRoleAssigned, nicknameUpdated, mainAccount };
-    
   } catch (error) {
-    console.error('Error in restoreUserRolesAndNickname:', error);
+    console.error("Error in restoreUserRolesAndNickname:", error);
     return { verifiedRoleAssigned: false, nicknameUpdated: false };
   }
 }
@@ -335,7 +369,7 @@ export function createEnhancedLinkSuccessMessage(
   }
   
   message += `\n**🎫 Ticket Access:**\n`;
-  message += `• You can now create tickets in the <#REDACTED_CHANNEL_VERIFICATION_ID> channel\n`;
+  message += `• You can now create tickets in the <#${CHANNEL_IDS.VERIFICATION_CHANNEL}> channel\n`;
   message += `• [Click here to Create a Ticket](https://discord.com/channels/REDACTED_GUILD_ID/REDACTED_CHANNEL_VERIFICATION_ID/1439260029328031776)\n`;
   
   message += `\n**🔧 Account Status:**\n`;
@@ -384,8 +418,6 @@ export function createRestoreSuccessMessage(
   } else {
     message += `• Your **nickname** is already set correctly\n`;
   }
-  
-  message += `• **Ticket access** is now restored\n`;
   
   message += `\n**🔧 Account Management:**\n`;
   message += `• Use **My Accounts** button to view all linked accounts\n`;

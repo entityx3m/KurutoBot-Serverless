@@ -434,9 +434,6 @@ export default {
         accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${clanInfo}${isMain}\n`;
       });
 
-      accountList += `\n**🎫 Ticket Access:** `;
-      accountList += userData.accounts.length > 0 ? `<a:AnimatedCheck:1427570005750448169> **Unlocked** (you can create tickets)\n` : `<a:redcross:1439044567415521443> **Not available**\n`;
-      
       accountList += `\n**📖 Account Management:**\n`;
       accountList += `• Use \`/player\` to view account details\n`;
       accountList += `• Use \`/unlink\` to remove accounts\n`;
