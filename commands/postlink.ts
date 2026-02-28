@@ -41,7 +41,7 @@ export default {
         fields: [
           {
             name: "<a:rg_blink:1456183866510282762> Quick Navigation",
-            value: "Verified? [**Click here to Create a Ticket**](https://discord.com/channels/REDACTED_GUILD_ID/REDACTED_CHANNEL_VERIFICATION_ID/1439260029328031776)",
+            value: "Verified? [**Click here to Create a Ticket**](https://discord.com/channels/REDACTED_GUILD_ID/REDACTED_CHANNEL_VERIFICATION_ID/REDACTED_MSG_ID)",
             inline: false
           }
         ],
