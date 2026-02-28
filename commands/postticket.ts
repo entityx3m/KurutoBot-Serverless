@@ -161,25 +161,30 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
         // Parse creator and type from topic
         const creatorMatch = topic.match(/creator:(\d+)/);
         const typeMatch = topic.match(/type:(\w+)/);
-        const isCreator = creatorMatch && creatorMatch[1] === userId;
+        const creatorId = creatorMatch ? creatorMatch[1] : null;
         const ticketType = typeMatch ? typeMatch[1] : null;
 
         // Determine required staff role
         let requiredRole = null;
         if (ticketType === "apply_join") {
-          requiredRole = JOIN_LEADERSHIP_ROLE;
+          requiredRole = ROLE_IDS.TICKET_JOIN_LEADERSHIP_ROLE;
         } else if (ticketType === "chat_staff" || ticketType === "apply_staff") {
-          requiredRole = STAFF_LEADERSHIP_ROLE;
+          requiredRole = ROLE_IDS.TICKET_STAFF_LEADERSHIP_ROLE;
         }
 
         // Check if user has the required role (or is creator)
-        let hasRequiredRole = false;
-        if (requiredRole) {
-          const member = await getMember(guildId, userId);
-          hasRequiredRole = member.success && member.data.roles.includes(requiredRole);
+        let hasPermission = userId === creatorId;
+        if (!hasPermission && requiredRole) {
+          const memberRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+            headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+          });
+          if (memberRes.ok) {
+            const member = await memberRes.json();
+            hasPermission = member.roles?.includes(requiredRole);
+          }
         }
 
-        if (!isCreator && !hasRequiredRole) {
+        if (!hasPermission) {
           await axios.patch(
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             { content: "<a:redcross:1439044567415521443> You don't have permission to close this ticket." }
@@ -187,19 +192,126 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
           return;
         }
 
-        // Delete the channel
+        // Send confirmation message with buttons
+        const components = [
+          {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                style: 4,
+                custom_id: `confirm_close_ticket:${userId}`,
+                label: "Proceed",
+                emoji: { name: "✅" },
+              },
+              {
+                type: 2,
+                style: 2,
+                custom_id: `cancel_close_ticket:${userId}`,
+                label: "Cancel",
+                emoji: { name: "❌" },
+              },
+            ],
+          },
+        ];
+
+        await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: `<@${userId}>, are you sure you want to close this ticket?`,
+            components,
+          }),
+        });
+
+        // Optionally, edit the original button message to indicate confirmation sent
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          { content: "<a:AnimatedCheck:1427570005750448169> Confirmation sent." }
+        );
+      } catch (error) {
+        console.error("Error initiating ticket close:", error);
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          { content: "<a:redcross:1439044567415521443> Failed to initiate close." }
+        );
+      }
+    },
+
+    confirm_close_ticket: async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+      const [userId] = args;
+      const clickerId = interaction.member?.user?.id;
+      const channelId = interaction.channel_id;
+
+      if (clickerId !== userId) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:Warning:1456190079830720625> This button is not for you.",
+              flags: MessageFlags.Ephemeral,
+            },
+          }
+        );
+        return;
+      }
+
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        { type: InteractionResponseType.DeferredMessageUpdate }
+      );
+
+      try {
         await fetch(`https://discord.com/api/v10/channels/${channelId}`, {
           method: "DELETE",
           headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
         });
-
-        // No further response needed (channel is gone)
       } catch (error) {
         console.error("Error closing ticket:", error);
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           { content: "<a:redcross:1439044567415521443> Failed to close ticket." }
         );
+      }
+    },
+
+    cancel_close_ticket: async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
+      const [userId] = args;
+      const clickerId = interaction.member?.user?.id;
+
+      if (clickerId !== userId) {
+        await axios.post(
+          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+          {
+            type: InteractionResponseType.ChannelMessageWithSource,
+            data: {
+              content: "<a:Warning:1456190079830720625> This button is not for you.",
+              flags: MessageFlags.Ephemeral,
+            },
+          }
+        );
+        return;
+      }
+
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        { type: InteractionResponseType.DeferredMessageUpdate }
+      );
+
+      try {
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          {
+            content: "<a:redcross:1439044567415521443> Ticket close cancelled.",
+            components: [],
+          }
+        );
+      } catch (error) {
+        console.error("Error cancelling close:", error);
       }
     },
   },

@@ -41,13 +41,8 @@ The content is organized as follows:
 
 <directory_structure>
 .eslintrc.json
-.github/copilot-instructions.md
 .gitignore
 .vercelignore
-ARCHITECTURE.md
-check-command-perms.js
-check.js
-cleanup-kv.js
 commands/add.ts
 commands/chat.ts
 commands/leave.ts
@@ -56,19 +51,14 @@ commands/ping.ts
 commands/player.ts
 commands/postlink.ts
 commands/postrecruit.ts
+commands/postticket.ts
 commands/servers.ts
 commands/unlink.ts
-COMPLETION_REPORT.md
-DEVELOPER_GUIDE.md
-full-cleanup.js
 index.ts
 package.json
 public/favicon.ico
 public/index.html
 README.md
-REFACTOR_STATUS.md
-REFACTORING_SUMMARY.md
-scripts/register-guild.ts
 scripts/register.ts
 tsconfig.json
 utils/addHelper.ts
@@ -105,108 +95,6 @@ This section contains the contents of the repository's files.
 }
 </file>
 
-<file path=".github/copilot-instructions.md">
-# AI Coding Agent Instructions
-
-## Project Overview
-Serverless Discord bot for BOOM House Clash of Clans alliance, deployed to Vercel using Discraft framework with TypeScript. Integrates Clash of Clans API, Vercel KV storage, and Google Generative AI.
-
-## Architecture
-
-### Three-Tier Structure
-1. **[index.ts](../index.ts)** - Main Vercel API handler, processes all Discord interactions (commands, buttons, modals)
-2. **[commands/](../commands/)** - Individual command modules (add.ts, chat.ts, link.ts, player.ts, etc.)
-3. **[utils/](../utils/)** - Shared utilities: types.ts, kvHelper.ts (Vercel KV wrapper), recruitment.ts (clan data)
-
-### Command Execution Flow
-- Discord POST → index.ts validates signature with `verifyKey()`
-- Interaction type determines routing: slash command → loads from [`.discraft/commands`]() (auto-built), button/modal → matched in index.ts handlers
-- All async, returns Discord API response via axios POST
-
-### Data Layer
-- **Vercel KV**: Only persistence layer, prefixed by `GUILD_ID` (e.g., `BOOM_HOUSE:user:{userId}`)
-- Key patterns: `user:{discordId}`, `tag:{playerTag}`, `{clanAbbr}:members`
-- Clash of Clans API: `https://cocproxy.royaleapi.dev/v1/clans/{tag}` (bearer token required)
-
-## Developer Workflows
-
-### Build & Deploy
-```bash
-npm run build          # Runs `discraft vercel build`, generates .discraft/ routes & commands
-npm run deploy         # `vercel --prod` deploys to Vercel
-npm run register       # `tsx scripts/register.ts`, registers commands to Discord bot
-npm run register-guild # `tsx scripts/register-guild.ts`, guild-specific registration
-```
-
-### Environment Setup
-Required in `.env` and Vercel project settings:
-- `DISCORD_PUBLIC_KEY`, `DISCORD_APP_ID`, `DISCORD_TOKEN`
-- `GOOGLE_AI_API_KEY`, `GOOGLE_AI_MODEL` (e.g., `gemini-2.0-flash-exp`)
-- `GUILD_ID` (optional, defaults to `'BOOM_HOUSE'`)
-- `COC_API_KEY` (Clash of Clans API bearer token)
-
-## Key Patterns & Conventions
-
-### Command Structure
-Commands export object with `data` (Discord CommandData) and `async execute()` returning [CommandExecuteResult](../utils/types.ts#L92):
-```typescript
-export default {
-  data: { name: "ping", description: "Check if bot is online" },
-  async execute({ interaction }: { interaction: SimplifiedInteraction }) {
-    return { content: "Pong!" };
-  }
-};
-```
-
-### Interaction Handlers in index.ts
-Modal/button submissions matched by `custom_id`, call handler functions returning axios response format:
-```typescript
-async function handleCocLinkModal(message: SimplifiedInteraction, res: VercelResponse) {
-  const userId = message.member?.user?.id;
-  await axios.post(`/interactions/${id}/${token}/callback`, {
-    type: InteractionResponseType.ChannelMessageWithSource,
-    data: { content: "...", flags: MessageFlags.Ephemeral }
-  });
-}
-```
-
-### KV Usage Pattern
-Helper functions in [kvHelper.ts](../utils/kvHelper.ts) wrap `@vercel/kv` with error handling:
-```typescript
-await setUserData(userId, { discordId, accounts: [...], lastUpdated: new Date().toISOString() });
-const data = await getUserData(userId);  // Returns UserData | null
-```
-
-### Constants & Configuration
-- **Clan mappings**: [CLAN_MAP](../commands/add.ts#L45) in add.ts (WM, LE, ZP, CH) with role/channel IDs
-- **Recruitment**: [RecruitmentTracker](../utils/recruitment.ts#L14) syncs live clan member counts from CoC API
-- **Type system**: [types.ts](../utils/types.ts) defines SimplifiedInteraction, PlayerAccount, UserData
-
-## Critical Implementation Details
-
-### Discraft Framework
-- Builds commands into `.discraft/commands/index.ts` automatically from `commands/` folder
-- Commands registered via Discord API in scripts/register.ts
-- `index.ts` is the single handler for all interactions (not individual API routes)
-
-### Discord Interaction Types
-1. Slash commands → [index.ts](../index.ts#L180) routes to command from `.discraft/commands`
-2. Button clicks → matched by `custom_id` in interaction.data
-3. Modal submissions → matched by `custom_id`, extract form values from `components`
-
-### Ephemeral Messages
-Use `flags: MessageFlags.Ephemeral` for private responses visible only to user who triggered interaction.
-
-### API Rate Limiting
-Chat command implements client-side rate limit per user (3 requests/min), stored in memory Map.
-
-## File Locations Reference
-- Commands: [commands/](../commands/) (each exported default command object)
-- Builders/embeds: Inline in [index.ts](../index.ts) (e.g., `createRecruitmentEmbed()`)
-- Environment variables: [.env example](../.env.example) (not in repo)
-- API proxy: [api/index.js](../api/index.js) (compiled output, don't edit)
-</file>
-
 <file path=".gitignore">
 dist
 api
@@ -228,371 +116,6 @@ node_modules
 .env
 .discraft
 .vercel
-</file>
-
-<file path="ARCHITECTURE.md">
-# Refactored Architecture Overview
-
-## Directory Structure
-
-```
-my-vercel-bot/
-│
-├── 📄 index.ts                          ← Main handler (unchanged)
-├── 📄 package.json
-├── 📄 tsconfig.json
-├── 📄 vercel.json
-│
-├── 📁 commands/                         ← Individual commands
-│   ├── add.ts                           ✅ Uses new helpers
-│   ├── chat.ts
-│   ├── leave.ts
-│   ├── link.ts                          ✅ Uses cocApi
-│   ├── ping.ts
-│   ├── player.ts                        ✅ Can use new helpers
-│   ├── postlink.ts
-│   ├── postrecruit.ts                   ✅ Uses updated recruitment
-│   ├── servers.ts
-│   └── unlink.ts
-│
-├── 📁 utils/                            ← REFACTORED CORE
-│   ├── config.ts                        🆕 Centralized config
-│   ├── cocApi.ts                        🆕 CoC API client
-│   ├── discordApi.ts                    🆕 Discord API helpers
-│   ├── addHelper.ts                     ✅ Refactored
-│   ├── kvHelper.ts                      (Vercel KV wrapper)
-│   ├── linkHelper.ts                    ✅ Refactored
-│   ├── logger.ts
-│   ├── recruitment.ts                   ✅ Refactored
-│   └── types.ts
-│
-├── 📁 scripts/
-│   ├── register.ts
-│   └── register-guild.ts
-│
-├── 📁 api/
-│   └── index.js                         (Compiled output - auto-generated)
-│
-├── 📁 public/
-│   └── index.html
-│
-├── 📄 README.md
-├── 📄 REFACTORING_SUMMARY.md            📖 What was changed
-└── 📄 DEVELOPER_GUIDE.md                📖 How to use new code
-```
-
----
-
-## Data Flow Architecture
-
-### Before Refactoring
-```
-Commands
-  ├─→ Hardcoded IDs/Tags (scattered)
-  ├─→ Direct fetch() to CoC API (duplicated)
-  ├─→ Direct axios to Discord (scattered)
-  └─→ Regex validation (repeated)
-```
-
-### After Refactoring
-```
-Commands
-  ├─→ config.ts (IDs, Clans, Validation)
-  ├─→ cocApi.ts (CoC API calls)
-  ├─→ discordApi.ts (Discord operations)
-  ├─→ linkHelper.ts (Account linking)
-  ├─→ addHelper.ts (Add member flow)
-  ├─→ recruitment.ts (Clan tracking)
-  └─→ kvHelper.ts (Data persistence)
-```
-
----
-
-## Module Responsibilities
-
-### 📋 config.ts
-```
-Responsibilities:
-✓ Store all IDs (Roles, Channels)
-✓ Define all Clans (WM, LE, ZP, CH, SP)
-✓ Provide API URLs
-✓ Validation patterns and functions
-✓ Global constants
-
-Used by: All commands, all helpers
-Updates: Whenever IDs or clans change
-```
-
-### 🔌 cocApi.ts
-```
-Responsibilities:
-✓ Fetch player data from CoC API
-✓ Fetch clan data from CoC API
-✓ Validate player tags
-✓ Handle all CoC API errors
-✓ Return typed responses
-
-Used by: link.ts, player.ts, recruitment.ts, add.ts
-Updates: If CoC API changes
-```
-
-### 💬 discordApi.ts
-```
-Responsibilities:
-✓ Send messages (ephemeral, embeds)
-✓ Defer interactions (deferred, update)
-✓ Manage roles (add, remove)
-✓ Update nicknames
-✓ Manage channels/DMs
-✓ Handle all Discord API errors
-
-Used by: All commands that interact with Discord
-Updates: If Discord API version changes
-```
-
-### 🔗 linkHelper.ts
-```
-Responsibilities:
-✓ Link player account to user
-✓ Validate account before linking
-✓ Check for existing links
-✓ Restore roles/nicknames
-✓ Format success messages
-
-Used by: link.ts, add.ts, postlink.ts handlers
-Updates: When linking flow changes
-```
-
-### ➕ addHelper.ts
-```
-Responsibilities:
-✓ Format add-member result messages
-✓ Send welcome DMs
-✓ Manage clan intro messages
-✓ Process visitor role
-✓ Create clan maps from config
-
-Used by: add.ts
-Updates: When add flow changes
-```
-
-### 📊 recruitment.ts
-```
-Responsibilities:
-✓ Track clan member counts
-✓ Fetch from CoC API via cocApi
-✓ Cache in Vercel KV
-✓ Calculate recruitment needs
-✓ Generate progress bars
-
-Used by: postrecruit.ts
-Updates: When recruitment logic changes
-```
-
----
-
-## Dependency Graph
-
-```
-config.ts (no dependencies)
-  ↓ used by ↓
-  │
-  ├─→ cocApi.ts (depends on config, fetch)
-  │    ↓
-  │    ├─→ linkHelper.ts (depends on cocApi, config, kvHelper)
-  │    └─→ recruitment.ts (depends on cocApi, config, kv)
-  │         ↓ used by
-  │         └─→ postrecruit.ts
-  │
-  ├─→ discordApi.ts (depends on config, axios)
-  │    ↓ used by
-  │    ├─→ linkHelper.ts
-  │    └─→ all Discord commands
-  │
-  ├─→ addHelper.ts (depends on config)
-  │    ↓ used by
-  │    └─→ add.ts
-  │
-  ├─→ kvHelper.ts (depends on config)
-  │    ↓ used by
-  │    ├─→ linkHelper.ts
-  │    └─→ all commands needing persistence
-  │
-  └─→ All commands use directly
-```
-
----
-
-## Configuration Update Workflow
-
-When something changes:
-
-### 🟢 Role/Channel ID Changes
-1. Update in `config.ts` → `ROLE_IDS` or `CHANNEL_IDS`
-2. ALL files automatically use new ID
-3. No other files to update
-4. Deploy!
-
-### 🟡 New Clan Added
-1. Add to `config.ts` → `CLANS` object
-2. `recruitment.ts` auto-initializes it
-3. All commands see new clan
-4. Deploy!
-
-### 🔵 Player Tag Validation Changes
-1. Update regex in `config.ts` → `VALIDATION.PLAYER_TAG_PATTERN`
-2. ALL validation calls use new pattern
-3. No other files to update
-4. Deploy!
-
-### 🟣 CoC API Changes
-1. Update `cocApi.ts` with new API logic
-2. All callers get updated behavior
-3. Single point of update
-4. Deploy!
-
-### 🔴 Discord API Changes
-1. Update `discordApi.ts` with new API calls
-2. All commands get updated behavior
-3. Single point of update
-4. Deploy!
-
----
-
-## Testing Checklist
-
-After refactoring, verify:
-
-- [ ] **Build completes** - `npm run build` succeeds
-- [ ] **Register works** - `npm run register` updates commands
-- [ ] **Account linking** - `/link` command works (link.ts)
-- [ ] **Add member** - `/add` command works (add.ts)
-- [ ] **Player lookup** - `/player` command works (player.ts)
-- [ ] **Recruitment posts** - `/postrecruit` updates (postrecruit.ts)
-- [ ] **Account unlinking** - `/unlink` command works (unlink.ts)
-- [ ] **No hardcoded IDs** - All use `ROLE_IDS` / `CHANNEL_IDS`
-- [ ] **Consistent error handling** - All API errors formatted
-- [ ] **Deployment works** - `npm run deploy` succeeds
-
----
-
-## Quick Facts
-
-- **Total Lines Refactored**: 400+
-- **Duplicate Code Eliminated**: 200+
-- **New Centralized Modules**: 3
-- **Config Centralization**: 100%
-- **Backward Compatibility**: 100%
-- **Compilation Status**: ✅ SUCCESS
-
----
-
-## File Sizes
-
-```
-config.ts           ~2 KB   (centralized config)
-cocApi.ts           ~4 KB   (API client)
-discordApi.ts       ~6 KB   (helper functions)
-addHelper.ts        ~5 KB   (add command helpers)
-linkHelper.ts       ~10 KB  (linking logic)
-recruitment.ts      ~5 KB   (recruitment tracker)
-```
-
----
-
-## Benefits Realized
-
-### For Maintainers
-✅ Single source of truth for all configuration
-✅ One place to update IDs or endpoints
-✅ Consistent error handling everywhere
-✅ Clear separation of concerns
-✅ Easy to add new helpers
-
-### For Developers
-✅ Type-safe API calls
-✅ Less boilerplate in commands
-✅ Clear documentation in helpers
-✅ Reusable code snippets
-✅ Easier debugging
-
-### For Users
-✅ Same functionality
-✅ More reliable error messages
-✅ Faster development of new features
-✅ Better maintainability = fewer bugs
-
----
-
-## Future Improvements
-
-Potential next steps:
-- Migrate remaining commands to use `discordApi` helpers
-- Add rate limiting wrapper to `cocApi`
-- Add caching layer to popular API calls
-- Add telemetry/monitoring to helpers
-- Create integration tests for helpers
-- Add request retry logic with exponential backoff
-</file>
-
-<file path="check-command-perms.js">
-// check-command-perms.js
-import { config } from 'dotenv';
-config();
-
-const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.DISCORD_APP_ID;
-
-async function checkCommandPermissions() {
-  console.log('Checking command permissions...\n');
-  
-  const res = await fetch(`https://discord.com/api/v10/applications/${CLIENT_ID}/commands`, {
-    headers: { 'Authorization': `Bot ${TOKEN}` }
-  });
-  
-  const commands = await res.json();
-  
-  commands.forEach(cmd => {
-    console.log(`📝 ${cmd.name}:`);
-    console.log(`   Description: ${cmd.description}`);
-    console.log(`   Default Permissions: ${cmd.default_member_permissions || 'None'}`);
-    console.log(`   DM Permission: ${cmd.dm_permission || 'Not set'}`);
-    console.log(`   Type: ${cmd.type || 'CHAT_INPUT'}`);
-    console.log('---');
-  });
-}
-
-checkCommandPermissions();
-</file>
-
-<file path="check.js">
-// check.js
-import { config } from 'dotenv';
-config();
-
-const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.DISCORD_APP_ID;
-
-async function checkCommands() {
-  console.log('Checking registered commands...');
-  
-  const response = await fetch(`https://discord.com/api/v10/applications/${CLIENT_ID}/commands`, {
-    headers: { 'Authorization': `Bot ${TOKEN}` }
-  });
-  
-  if (!response.ok) {
-    console.log(`Failed: ${response.status}`);
-    return;
-  }
-  
-  const commands = await response.json();
-  console.log(`Found ${commands.length} commands:`);
-  commands.forEach(cmd => {
-    console.log(`- ${cmd.name}: ${cmd.description} (ID: ${cmd.id})`);
-  });
-}
-
-checkCommands();
 </file>
 
 <file path="commands/ping.ts">
@@ -621,569 +144,587 @@ export default {
 };
 </file>
 
-<file path="COMPLETION_REPORT.md">
-# ✅ Refactoring Complete - Summary
-
-## What Was Done
-
-Your Discord bot codebase has been successfully refactored to eliminate duplicates and centralize configuration, API logic, and Discord helpers.
-
----
-
-## 🆕 New Files Created
-
-### 1. **utils/config.ts** (2 KB)
-- **Purpose**: Centralized single source of truth
-- **Contents**: 
-  - All Role IDs (VERIFIED, BOOM_MEMBER, clan roles)
-  - All Channel IDs (clan channels, misc)
-  - All Clan definitions (WM, LE, ZP, CH, SP)
-  - API URLs and validation patterns
-- **Benefits**: Update any ID in one place, all code uses it
-
-### 2. **utils/cocApi.ts** (4 KB)
-- **Purpose**: Unified Clash of Clans API client
-- **Methods**:
-  - `getPlayer(playerTag)` - Fetch player data
-  - `getClan(clanTag)` - Fetch clan data
-  - `validateAndCleanTag(tag)` - Validate & clean tags
-- **Benefits**: Consistent error handling, typed responses, single API endpoint
-
-### 3. **utils/discordApi.ts** (6 KB)
-- **Purpose**: Unified Discord API operations
-- **Methods**:
-  - `sendEphemeralReply()` - Send ephemeral messages
-  - `showModal()` - Display modals
-  - `addMemberRole()` - Assign roles
-  - `setMemberNickname()` - Update nicknames
-  - 7 more helper functions
-- **Benefits**: Replaces repeated axios/fetch calls, consistent error handling
-
----
-
-## ✅ Files Updated
-
-### 1. **utils/recruitment.ts**
-- ✅ Now uses `cocApi.getClan()` instead of direct fetch
-- ✅ Imports config from `config.ts`
-- ✅ Uses `CLAN_TAGS` and `CLAN_NAMES` from config
-- ✅ Much cleaner, 20% less code
-
-### 2. **utils/addHelper.ts**
-- ✅ Imports `CLANS`, `ROLE_IDS`, `CHANNEL_IDS` from config
-- ✅ Re-exports as `IDS` and `CLAN_MAP` for backward compatibility
-- ✅ All hardcoded IDs replaced with config references
-- ✅ Zero breaking changes to existing code
-
-### 3. **utils/linkHelper.ts**
-- ✅ Uses `cocApi.getPlayer()` instead of direct fetch
-- ✅ Uses `VALIDATION` from config for player tag validation
-- ✅ Uses `ROLE_IDS` from config (no more hardcoded)
-- ✅ Cleaner error handling via cocApi
-
----
-
-## 📊 Duplicate Reduction
-
-| Item | Before | After | Status |
-|------|--------|-------|--------|
-| Player tag validation regex | 3 places | 1 place | ✅ 67% reduced |
-| Role/Channel IDs | Scattered | config.ts | ✅ 100% centralized |
-| CoC API fetch calls | 3+ places | cocApi.ts | ✅ 67% reduced |
-| Discord API calls | Scattered | discordApi.ts | ✅ Unified |
-| Error handling | Inconsistent | Consistent | ✅ Improved |
-| Config magic strings | 50+ | 0 | ✅ Eliminated |
-
----
-
-## 🔧 How to Use New Code
-
-### Validate a Player Tag
-```typescript
-import { VALIDATION } from "./utils/config";
-
-if (!VALIDATION.isValidPlayerTag(VALIDATION.cleanPlayerTag(tag))) {
-  // Invalid
-}
-```
-
-### Fetch Player Data
-```typescript
-import { cocApi } from "./utils/cocApi";
-
-const result = await cocApi.getPlayer(playerTag);
-if (result.success) {
-  console.log(result.data.name);
-} else {
-  console.error(result.message); // Already formatted
-}
-```
-
-### Send Ephemeral Message
-```typescript
-import { sendEphemeralReply } from "./utils/discordApi";
-
-await sendEphemeralReply(interactionId, token, "Your message");
-```
-
-### Access Configuration
-```typescript
-import { CLANS, ROLE_IDS, CHANNEL_IDS } from "./utils/config";
-
-console.log(CLANS.WM.name);        // "WAR MASTER"
-console.log(ROLE_IDS.VERIFIED);    // Role ID
-console.log(CHANNEL_IDS.CLANS_LIST); // Channel ID
-```
-
----
-
-## 📚 Documentation Created
-
-### 1. **REFACTORING_SUMMARY.md**
-- Complete before/after comparison
-- Lists all changes made
-- Benefits of each change
-- Migration path for future work
-
-### 2. **DEVELOPER_GUIDE.md**
-- Quick reference for common tasks
-- Code examples for each helper
-- Usage patterns and best practices
-- Adding new clans / updating config
-- Performance notes
-- Error handling patterns
-
-### 3. **ARCHITECTURE.md**
-- Directory structure overview
-- Module responsibilities
-- Dependency graph
-- Configuration update workflow
-- Testing checklist
-- Benefits realized
-- Future improvement ideas
-
----
-
-## ✅ Build Status
-
-```
-✅ Build completed successfully
-✅ No compilation errors
-✅ All 10 commands registered
-✅ Ready to deploy
-```
-
-Run: `npm run build` (automatically done)
-
----
-
-## 🔄 Backward Compatibility
-
-**100% Backward Compatible** - All existing code continues to work:
-- ✅ All imports still work
-- ✅ All function signatures unchanged
-- ✅ All command behavior identical
-- ✅ Soft migration - use new helpers gradually
-
----
-
-## 🚀 What's Next
-
-### Option 1: Deploy Now
-```bash
-npm run deploy
-```
-All refactoring is internal - no user-facing changes.
-
-### Option 2: Further Optimize (Future)
-These commands could use `discordApi` helpers for more improvements:
-- link.ts
-- player.ts
-- add.ts
-
-These are ready whenever you want to migrate.
-
----
-
-## 📋 File Summary
-
-```
-Total New Code:     ~30 KB (3 new modules)
-Total Updated Code: ~20 KB (3 updated modules)
-Duplicates Removed: ~200 lines of code
-Centralized Config: 100%
-Type Safety:        Improved
-Error Handling:     Consistent
-Build Status:       ✅ SUCCESS
-Tests:              Ready to verify
-```
-
----
-
-## ✨ Key Improvements
-
-### For Maintainability
-- 🎯 Single source of truth (config.ts)
-- 🔧 One place to update IDs, clans, or endpoints
-- 📚 Clear documentation on every module
-- 🧪 Type-safe API responses
-
-### For Development
-- ⚡ Faster command development
-- 📖 Reusable code examples in helpers
-- 🐛 Easier debugging
-- 🔄 Consistent patterns throughout
-
-### For Production
-- 🚀 Same functionality
-- 🛡️ Better error messages
-- 📈 Easier to add features
-- 🔒 Fewer bugs from inconsistent code
-
----
-
-## 📖 Documentation Files
-
-All documentation is in the root directory:
-- `REFACTORING_SUMMARY.md` - Detailed before/after
-- `DEVELOPER_GUIDE.md` - How to use new code
-- `ARCHITECTURE.md` - System overview
-
-Read these files for:
-- Complete list of changes
-- Code examples
-- Best practices
-- Future improvement ideas
-
----
-
-## 🎓 Learning Resources
-
-### Quick Start
-1. Read `DEVELOPER_GUIDE.md` for common patterns
-2. Look at existing command (e.g., `commands/player.ts`)
-3. Reference `config.ts` for available constants
-4. Use helpers from appropriate module
-
-### Deep Dive
-1. Read `ARCHITECTURE.md` for system design
-2. Review `REFACTORING_SUMMARY.md` for what changed
-3. Check module docstrings in each helper file
-4. Study existing command implementations
-
----
-
-## ✅ Verification
-
-The refactoring is complete and verified:
-
-- [x] config.ts created - all IDs centralized
-- [x] cocApi.ts created - all CoC calls unified
-- [x] discordApi.ts created - all Discord ops unified
-- [x] recruitment.ts updated - uses cocApi
-- [x] addHelper.ts updated - uses config
-- [x] linkHelper.ts updated - uses cocApi & config
-- [x] Build succeeds - npm run build
-- [x] Commands registered - npm run register
-- [x] Documentation complete - 3 guide files
-- [x] Backward compatible - all existing code works
-- [x] Ready to deploy - npm run deploy
-
----
-
-## 🎉 Summary
-
-Your codebase is now:
-- ✅ More maintainable
-- ✅ More scalable
-- ✅ Better documented
-- ✅ Type-safe
-- ✅ DRY (Don't Repeat Yourself)
-- ✅ Ready for future growth
-
-**All changes are production-ready. Deploy with confidence!**
-</file>
-
-<file path="DEVELOPER_GUIDE.md">
-# Developer Quick Reference - Refactored Codebase
-
-## 🎯 Where to Find Things Now
-
-### Configuration & Constants
-```
-utils/config.ts
-├── API_URLS - API endpoints
-├── ROLE_IDS - All Discord role IDs
-├── CHANNEL_IDS - All Discord channel IDs
-├── CLANS - Clan definitions (WM, LE, ZP, CH, SP)
-├── VALIDATION - Player tag validation
-└── GUILD_ID / MAIN_SERVER_ID - Global constants
-```
-
-### API Handlers
-```
-utils/cocApi.ts         → All Clash of Clans API calls
-utils/discordApi.ts     → All Discord API operations
-utils/linkHelper.ts     → Account linking logic
-utils/recruitment.ts    → Clan recruitment tracking
-```
-
-### Utilities
-```
-utils/kvHelper.ts       → Vercel KV storage helpers
-utils/addHelper.ts      → Add member helpers
-utils/logger.ts         → Logging
-utils/types.ts          → TypeScript interfaces
-```
-
----
-
-## 📚 Common Tasks
-
-### ✅ Validate a Player Tag
-```typescript
-import { VALIDATION } from "./utils/config";
-
-const validation = VALIDATION.cleanPlayerTag(userInput);
-if (!VALIDATION.isValidPlayerTag(validation)) {
-  return "Invalid tag format";
-}
-const cleanTag = validation; // Use this
-```
-
-### ✅ Fetch Player Data from CoC API
-```typescript
-import { cocApi } from "./utils/cocApi";
-
-const result = await cocApi.getPlayer(playerTag);
-if (result.success) {
-  const player = result.data;
-  console.log(player.name, player.townHallLevel);
-} else {
-  console.error(result.message); // Already formatted error
-}
-```
-
-### ✅ Fetch Clan Data from CoC API
-```typescript
-import { cocApi } from "./utils/cocApi";
-
-const result = await cocApi.getClan(clanTag);
-if (result.success) {
-  console.log(`${result.data.name}: ${result.data.members}/50`);
-}
-```
-
-### ✅ Send Ephemeral Message
-```typescript
-import { sendEphemeralReply } from "./utils/discordApi";
-
-await sendEphemeralReply(
-  interactionId,
-  token,
-  "Only you can see this message"
-);
-```
-
-### ✅ Send Embed (Ephemeral)
-```typescript
-import { sendEphemeralEmbed } from "./utils/discordApi";
-
-await sendEphemeralEmbed(interactionId, token, [
-  {
-    title: "Player Stats",
-    description: "...",
-    color: 5793266
+<file path="commands/postticket.ts">
+// commands/postticket.ts
+import axios from "axios";
+import {
+  ApplicationCommandType,
+  InteractionResponseType,
+  MessageFlags,
+  PermissionFlagsBits,
+} from "discord-api-types/v10";
+import type {
+  CommandData,
+  CommandExecuteResult,
+  SimplifiedInteraction,
+} from "../utils/types";
+import {
+  sendEphemeralReply,
+  showModal,
+  sendChannelMessage,
+  getMember,
+} from "../utils/discordApi";
+import { ROLE_IDS, CHANNEL_IDS } from "../utils/config";
+
+// Role IDs used for ticket permissions (you can also put these in config)
+const JOIN_LEADERSHIP_ROLE = ROLE_IDS.TICKET_JOIN_LEADERSHIP_ROLE || "REDACTED_TICKET_JOIN_LEADERSHIP_ID";
+const STAFF_LEADERSHIP_ROLE = ROLE_IDS.TICKET_STAFF_LEADERSHIP_ROLE || "REDACTED_TICKET_STAFF_LEADERSHIP_ID";
+const TICKET_CATEGORY = CHANNEL_IDS.TICKET_CATEGORY; // must be set in config
+
+const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
+const VERIFIED_ROLE_ID = ROLE_IDS.VERIFIED;
+
+export default {
+  data: {
+    name: "postticket",
+    description: "Post ticket creation embed with buttons",
+    type: ApplicationCommandType.ChatInput,
+    default_member_permissions: PermissionFlagsBits.ManageMessages.toString(),
+  } as CommandData,
+
+  async execute(data: {
+    interaction: SimplifiedInteraction;
+  }): CommandExecuteResult {
+    const interaction = data.interaction;
+
+    if (interaction.guild_id !== MAIN_SERVER_ID) {
+      return {
+        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+        flags: MessageFlags.Ephemeral,
+      };
+    }
+
+    const embed = {
+      author: {
+        name: "BOOM House | Ticket Center",
+        icon_url: "https://cdn.discordapp.com/attachments/1412097601289064609/1430484430425948270/Picsart_25-10-22_17-08-58-571.png",
+      },
+      title: "Welcome to the BOOM House Clash of Clans Alliance! ⚔️",
+      description: `We're a competitive network of 4 active clans led by **War Master** — our elite war clan with *an undefeated war streak*. 💪  
+Each clan follows the same standards of strategy, discipline, and teamwork — building a united alliance for serious and growth-driven players.
+
+📍 You can view all our clans here: <#REDACTED_CHANNEL_CLANS_LIST_ID>  
+
+Please choose an option below to get started:
+
+\`\`\` 🎟️ Apply to Join \`\`\` 🔹 Submit your application to join one of our clans. *(For new applicants only.)*
+
+\`\`\` 🛡️ Chat with Staff \`\`\` 🔹 For **BOOM House members, ex-members, and approved visitors** needing assistance.
+
+\`\`\` ⚔️ Apply for Staff \`\`\` 🔹 For **current BOOM House members** interested in joining the alliance team.
+
+Thank you for your interest in BOOM House — where excellence in war and unity define every Chief. 🔥`,
+      image: {
+        url: "https://cdn.discordapp.com/attachments/1412097601289064609/1427260863295000616/bhticket.png",
+      },
+      footer: {
+        text: "BOOM House | Clash of Clans Alliance",
+        icon_url: "https://cdn.discordapp.com/attachments/1412097601289064609/1430484430425948270/Picsart_25-10-22_17-08-58-571.png",
+      },
+      color: 0xFEE75C,
+    };
+
+    const components = [
+      {
+        type: 1, // ACTION_ROW
+        components: [
+          {
+            type: 2, // BUTTON
+            style: 1, // PRIMARY
+            custom_id: "ticket_apply_join",
+            label: "Apply to Join",
+            emoji: { name: "🎟️" },
+          },
+          {
+            type: 2,
+            style: 3, // SUCCESS
+            custom_id: "ticket_chat_staff",
+            label: "Chat with Staff",
+            emoji: { name: "🛡️" },
+          },
+          {
+            type: 2,
+            style: 4, // DANGER
+            custom_id: "ticket_apply_staff",
+            label: "Apply for Staff",
+            emoji: { name: "⚔️" },
+          },
+        ],
+      },
+    ];
+
+    return {
+      embeds: [embed],
+      components,
+    };
+  },
+
+  handlers: {
+    // ---- BUTTON HANDLERS ----
+    ticket_apply_join: async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      await handleTicketButton(interaction, "apply_join");
+    },
+    ticket_chat_staff: async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      await handleTicketButton(interaction, "chat_staff");
+    },
+    ticket_apply_staff: async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      await handleTicketButton(interaction, "apply_staff");
+    },
+
+    // ---- MODAL HANDLERS ----
+    ticket_apply_join_modal: async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      await handleTicketModal(interaction, "apply_join");
+    },
+    ticket_chat_staff_modal: async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      await handleTicketModal(interaction, "chat_staff");
+    },
+    ticket_apply_staff_modal: async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      await handleTicketModal(interaction, "apply_staff");
+    },
+
+    // ---- CLOSE TICKET BUTTON ----
+    close_ticket: async ({ interaction }: { interaction: SimplifiedInteraction }) => {
+      const userId = interaction.member?.user?.id;
+      const channelId = interaction.channel_id;
+      const guildId = interaction.guild_id;
+
+      if (!userId || !channelId || !guildId) return;
+
+      // Defer the button press
+      await axios.post(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        { type: InteractionResponseType.DeferredMessageUpdate }
+      );
+
+      try {
+        // Fetch channel to get its topic
+        const channelRes = await fetch(`https://discord.com/api/v10/channels/${channelId}`, {
+          headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+        });
+        if (!channelRes.ok) throw new Error("Could not fetch channel");
+        const channel = await channelRes.json();
+        const topic = channel.topic || "";
+
+        // Parse creator and type from topic
+        const creatorMatch = topic.match(/creator:(\d+)/);
+        const typeMatch = topic.match(/type:(\w+)/);
+        const isCreator = creatorMatch && creatorMatch[1] === userId;
+        const ticketType = typeMatch ? typeMatch[1] : null;
+
+        // Determine required staff role
+        let requiredRole = null;
+        if (ticketType === "apply_join") {
+          requiredRole = JOIN_LEADERSHIP_ROLE;
+        } else if (ticketType === "chat_staff" || ticketType === "apply_staff") {
+          requiredRole = STAFF_LEADERSHIP_ROLE;
+        }
+
+        // Check if user has the required role (or is creator)
+        let hasRequiredRole = false;
+        if (requiredRole) {
+          const member = await getMember(guildId, userId);
+          hasRequiredRole = member.success && member.data.roles.includes(requiredRole);
+        }
+
+        if (!isCreator && !hasRequiredRole) {
+          await axios.patch(
+            `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+            { content: "<a:redcross:1439044567415521443> You don't have permission to close this ticket." }
+          );
+          return;
+        }
+
+        // Delete the channel
+        await fetch(`https://discord.com/api/v10/channels/${channelId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+        });
+
+        // No further response needed (channel is gone)
+      } catch (error) {
+        console.error("Error closing ticket:", error);
+        await axios.patch(
+          `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+          { content: "<a:redcross:1439044567415521443> Failed to close ticket." }
+        );
+      }
+    },
+  },
+};
+
+// ----- Helper Functions -----
+
+async function handleTicketButton(interaction: SimplifiedInteraction, type: string) {
+  const userId = interaction.member?.user?.id;
+  const guildId = interaction.guild_id;
+
+  if (!userId || !guildId) {
+    await sendEphemeralReply(interaction.id, interaction.token, "Could not identify you.");
+    return;
   }
-]);
-```
 
-### ✅ Assign a Role
-```typescript
-import { addMemberRole } from "./utils/discordApi";
-import { ROLE_IDS } from "./utils/config";
+  // Check if user has Verified role
+  const member = await getMember(guildId, userId);
+  if (!member.success || !member.data.roles.includes(VERIFIED_ROLE_ID)) {
+    await sendEphemeralReply(
+      interaction.id,
+      interaction.token,
+      "<a:redcross:1439044567415521443> You must link your Clash of Clans account first!\nUse `/link` or the **Link Account** button to get verified."
+    );
+    return;
+  }
 
-const result = await addMemberRole(
-  guildId,
-  memberId,
-  ROLE_IDS.BOOM_MEMBER,
-  "Accepted into clan"
-);
+  // Show the appropriate modal
+  let modal: any;
+  switch (type) {
+    case "apply_join":
+      modal = createApplyJoinModal();
+      break;
+    case "chat_staff":
+      modal = createChatStaffModal();
+      break;
+    case "apply_staff":
+      modal = createApplyStaffModal();
+      break;
+    default:
+      return;
+  }
 
-if (!result.success) {
-  console.error(result.error);
-}
-```
-
-### ✅ Update Member Nickname
-```typescript
-import { setMemberNickname } from "./utils/discordApi";
-
-await setMemberNickname(
-  guildId,
-  memberId,
-  "PlayerName | TH12",
-  "Updated from CoC account"
-);
-```
-
-### ✅ Access Clan Information
-```typescript
-import { CLANS, ROLE_IDS, CHANNEL_IDS } from "./utils/config";
-
-const wmClan = CLANS.WM;
-console.log(wmClan.name);       // "WAR MASTER"
-console.log(wmClan.roleId);     // Role ID for WM
-console.log(wmClan.channelId);  // Channel ID for WM
-console.log(wmClan.tag);        // "REDACTED_WM_CLAN_TAG"
-```
-
-### ✅ Link CoC Account to User
-```typescript
-import { linkPlayerAccount } from "./utils/linkHelper";
-
-const result = await linkPlayerAccount(
-  playerTag,
-  userId,
-  discordUsername,
-  executorId,    // optional: staff member linking them
-  guildId,       // optional: for role/nick updates
-  true,          // assign verified role
-  true           // set nickname
-);
-
-if (result.success) {
-  console.log(`✅ ${result.userData.discordName} linked!`);
-} else {
-  console.error(result.message);
-}
-```
-
-### ✅ Update Recruitment Data
-```typescript
-import { RecruitmentTracker } from "./utils/recruitment";
-
-// Fetch latest from CoC API
-await RecruitmentTracker.updateFromAPI();
-
-// Get summary
-const summary = await RecruitmentTracker.getSummary();
-console.log(`${summary.totalMembers}/${summary.totalCapacity} members`);
-
-// Get specific clan
-const clan = await RecruitmentTracker.getClan("WM");
-console.log(`${clan.name}: ${clan.memberCount}/50`);
-```
-
----
-
-## 🔄 Migration Path for Existing Commands
-
-If updating existing commands, follow this order:
-
-1. **Import new helpers** - Add imports at top
-2. **Replace validation** - Use `VALIDATION` instead of regex
-3. **Replace API calls** - Use `cocApi` instead of fetch
-4. **Replace Discord ops** - Use `discordApi` helpers
-5. **Replace IDs** - Use `ROLE_IDS`, `CHANNEL_IDS`, `CLANS`
-6. **Test thoroughly** - Ensure all flows work
-
-**Example Migration**:
-```typescript
-// BEFORE
-const cleanTag = tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-if (!/^[A-Z0-9]{3,15}$/.test(cleanTag)) { /* error */ }
-const response = await fetch(`https://cocproxy.royaleapi.dev/v1/players/%23${cleanTag}`, { ... })
-const roleId = "REDACTED_VERIFIED_ID";
-await axios.post(`https://discord.com/api/v10/interactions/...`, { ... })
-
-// AFTER
-import { VALIDATION, ROLE_IDS } from "./utils/config";
-import { cocApi } from "./utils/cocApi";
-import { sendEphemeralReply } from "./utils/discordApi";
-
-const cleanTag = VALIDATION.cleanPlayerTag(tag);
-if (!VALIDATION.isValidPlayerTag(cleanTag)) { /* error */ }
-const result = await cocApi.getPlayer(cleanTag);
-if (!result.success) { /* error: result.message */ }
-const roleId = ROLE_IDS.VERIFIED;
-await sendEphemeralReply(interactionId, token, message);
-```
-
----
-
-## 🛠️ Adding a New Clan
-
-If new clans are added to the alliance:
-
-1. **Update `config.ts`** - Add to `CLANS` object with full info
-2. **Update recruitment.ts** - Automatically picks up new clan
-3. **Commands update** - All commands use config, no changes needed
-4. **Deploy** - Single source of truth updated!
-
-Example:
-```typescript
-// In config.ts - CLANS object
-NEW: {
-  abbr: "NEW",
-  name: "New Clan Name",
-  roleId: "role-id-from-discord",
-  channelId: "channel-id-from-discord",
-  tag: "#CLANTAGHERE"
-}
-```
-
----
-
-## 📋 Error Handling Pattern
-
-All API helpers return consistent response format:
-
-```typescript
-interface Response {
-  success: boolean;
-  data?: T;           // Only if success
-  error?: string;     // Only if failed
-  message?: string;   // For user-facing errors (CoC API)
-  statusCode?: number;
+  await showModal(interaction.id, interaction.token, modal.custom_id, modal.title, modal.components);
 }
 
-// Usage
-if (result.success) {
-  // Handle result.data
-} else {
-  // Handle result.error or result.message
+async function handleTicketModal(interaction: SimplifiedInteraction, type: string) {
+  const userId = interaction.member?.user?.id;
+  const guildId = interaction.guild_id;
+  const username = interaction.member?.user?.username || "user";
+
+  if (!userId || !guildId) {
+    await sendEphemeralReply(interaction.id, interaction.token, "Could not identify you.");
+    return;
+  }
+
+  // Parse answers from modal components
+  const answers: Record<string, string> = {};
+  for (const row of interaction.data?.components || []) {
+    for (const comp of row.components) {
+      answers[comp.custom_id] = comp.value || "";
+    }
+  }
+
+  // Create channel name
+  const safeUsername = username.toLowerCase().replace(/[^a-z0-9]/g, "-");
+  const formatAnswerValue = (answer?: string) => {
+    const safeAnswer = (answer || "Not answered").replace(/```/g, "'''");
+    return `\`\`\`${safeAnswer}\`\`\``;
+  };
+
+  const createEmbedField = (question: string, answer?: string, inline?: boolean) => ({
+    name: `**${question}**`,
+    value: formatAnswerValue(answer),
+    inline,
+  });
+
+  let channelName = "";
+  let welcomeMessage = "";
+  let staffRoleId = "";
+  let embedFields: { name: string; value: string; inline?: boolean }[] = [];
+
+  switch (type) {
+    case "apply_join":
+      channelName = `join-clan-${safeUsername}`;
+      welcomeMessage = `Hey <@${userId}> 👋  
+Thank you for applying to join the **Boom House Clash of Clans Alliance!** ⚡
+
+Your **application form** has been received successfully.  
+One of our leaders will review your submission shortly. 🕵️‍♂️
+<@&${JOIN_LEADERSHIP_ROLE}>
+
+Please **stay in this ticket** while we go over your details — we’ll get back to you as soon as possible.  
+Once reviewed, you’ll be notified here with the next steps. 💬
+
+**Welcome to the Boom House family, and good luck, Chief!** 🍀`;
+      staffRoleId = JOIN_LEADERSHIP_ROLE;
+      embedFields = [
+        createEmbedField("1️⃣ Did you link your account?", answers.q1, true),
+        createEmbedField("2️⃣ How many CoC accounts do you have?", answers.q2, true),
+        createEmbedField("3️⃣ Who recruited you?", answers.q3, true),
+      ];
+      break;
+    case "chat_staff":
+      channelName = `chat-staff-${safeUsername}`;
+      welcomeMessage = `Hey <@${userId}> 👋  
+Thank you for reaching out to the **Boom House Alliance Staff Team.**  
+A **<@&${STAFF_LEADERSHIP_ROLE}>** member will assist you shortly. ⚔️  
+
+Please wait patiently while our staff reviews your concern.
+Kindly keep all communication respectful and within this ticket. 💬`;
+      staffRoleId = STAFF_LEADERSHIP_ROLE;
+      embedFields = [
+        createEmbedField("Describe your concern in detail", answers.q1, false),
+      ];
+      break;
+    case "apply_staff":
+      channelName = `apply-staff-${safeUsername}`;
+      welcomeMessage = `Hey <@${userId}> 👋  
+Your **staff application** has been received. A **<@&${STAFF_LEADERSHIP_ROLE}>** member will review it soon. ⚔️  
+
+Please wait patiently while we go over your answers.  
+You’ll be contacted here once a decision or follow-up interview is ready. 💬  
+
+Thank you for your interest in joining the **Boom House Alliance Staff Team!** 🛡️`;
+      staffRoleId = STAFF_LEADERSHIP_ROLE;
+      embedFields = [
+        createEmbedField("Are you a member of any BOOM House Clans?", answers.q1, false),
+        createEmbedField("Why do you want to become a staff member?", answers.q2, false),
+        createEmbedField("How active are you on Discord and CoC?", answers.q3, false),
+        createEmbedField("Anything else you’d like us to know?", answers.q4, false),
+      ];
+      break;
+    default:
+      return;
+  }
+
+  // Defer the modal submission
+  await axios.post(
+    `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+    {
+      type: InteractionResponseType.DeferredChannelMessageWithSource,
+      data: { flags: MessageFlags.Ephemeral },
+    }
+  );
+
+  try {
+    // Create the ticket channel
+    const channelPayload = {
+      name: channelName,
+      type: 0, // GUILD_TEXT
+      parent_id: TICKET_CATEGORY,
+      topic: `creator:${userId}|type:${type}`,
+      permission_overwrites: [
+        {
+          id: guildId, // @everyone
+          type: 0, // role
+          deny: (1 << 10) | (1 << 11) | (1 << 12), // VIEW_CHANNEL, SEND_MESSAGES, READ_MESSAGE_HISTORY
+        },
+        {
+          id: userId, // ticket creator
+          type: 1, // member
+          allow: (1 << 10) | (1 << 11) | (1 << 12), // allow view, send, read history
+        },
+        {
+          id: staffRoleId, // leadership role
+          type: 0, // role
+          allow: (1 << 10) | (1 << 11) | (1 << 12), // view, send, read history
+        },
+        {
+          id: process.env.DISCORD_APP_ID!, // bot itself
+          type: 1, // member
+          allow: (1 << 10) | (1 << 11) | (1 << 12) | (1 << 4), // also allow MANAGE_CHANNELS (for close)
+        },
+      ],
+    };
+
+    const createRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(channelPayload),
+    });
+
+    if (!createRes.ok) {
+      throw new Error(`Failed to create channel: ${createRes.statusText}`);
+    }
+
+    const channel = await createRes.json();
+
+    // Send welcome message
+    await sendChannelMessage(channel.id, { content: welcomeMessage });
+
+    // Send embed with answers
+    const embed = {
+      title: "📋 Application Details",
+      color: 0x5865F2,
+      fields: embedFields,
+      timestamp: new Date().toISOString(),
+    };
+    await sendChannelMessage(channel.id, { embeds: [embed] });
+
+    // Add Close button to the channel
+    const closeButton = {
+      type: 1,
+      components: [
+        {
+          type: 2,
+          style: 4, // DANGER
+          custom_id: "close_ticket",
+          label: "Close Ticket",
+          emoji: { name: "🔒" },
+        },
+      ],
+    };
+    await sendChannelMessage(channel.id, { components: [closeButton] });
+
+    // After channel creation, send ephemeral confirmation
+    await axios.post(
+      `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}`,
+      {
+        content: `<a:AnimatedCheck:1427570005750448169> Your ticket has been created: <#${channel.id}>`,
+        flags: MessageFlags.Ephemeral,
+      }
+    );
+  } catch (error) {
+    console.error("Error creating ticket:", error);
+    await axios.patch(
+      `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
+      {
+        content: `<a:redcross:1439044567415521443> Failed to create ticket: ${error instanceof Error ? error.message : "Unknown error"}`,
+      }
+    );
+  }
 }
-```
 
----
+// ----- Modal Creators -----
 
-## 🔗 Related Files
+function createApplyJoinModal() {
+  return {
+    custom_id: "ticket_apply_join_modal",
+    title: "Apply to Join a Clan",
+    components: [
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "q1",
+            label: "1️⃣ Did you link your account?",
+            style: 1,
+            placeholder: "Y/N",
+            required: true,
+            max_length: 10,
+          },
+        ],
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "q2",
+            label: "2️⃣ How many CoC accounts do you have?",
+            style: 2, // PARAGRAPH
+            placeholder: "Include their TH levels",
+            required: true,
+            max_length: 200,
+          },
+        ],
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "q3",
+            label: "3️⃣ Who recruited you?",
+            style: 1,
+            placeholder: "Name of the Recruiter",
+            required: true,
+            max_length: 100,
+          },
+        ],
+      },
+    ],
+  };
+}
 
-- **Commands**: `commands/add.ts`, `commands/link.ts`, `commands/player.ts`
-- **Index handler**: `index.ts` - Routes interactions
-- **Build output**: `api/index.js` - Compiled version (don't edit)
-- **Environment**: `.env.example` - Shows required vars
-- **Types**: `utils/types.ts` - TypeScript interfaces
+function createChatStaffModal() {
+  return {
+    custom_id: "ticket_chat_staff_modal",
+    title: "Chat with Staff",
+    components: [
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "q1",
+            label: "Describe your concern in detail",
+            style: 2,
+            placeholder: "Enter your concern",
+            required: true,
+            max_length: 500,
+          },
+        ],
+      },
+    ],
+  };
+}
 
----
-
-## ⚡ Performance Notes
-
-- **Config imports are static** - No runtime cost
-- **API calls are cached** - Recruitment data cached in KV
-- **Validation is synchronous** - Cheap regex operation
-- **Discord helpers use same axios instance** - Connection reuse
-
----
-
-## 📞 Support
-
-For questions about the refactoring:
-- See `REFACTORING_SUMMARY.md` for detailed before/after
-- Check this file for common patterns
-- Review individual helper files for docstrings
-- Look at existing command implementations for examples
+function createApplyStaffModal() {
+  return {
+    custom_id: "ticket_apply_staff_modal",
+    title: "Apply for Staff",
+    components: [
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "q1",
+            label: "Are you a member of any BOOM House Clans?",
+            style: 1,
+            placeholder: "If yes, please specify which one.",
+            required: true,
+            max_length: 100,
+          },
+        ],
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "q2",
+            label: "Why do you want to become a staff member?",
+            style: 2,
+            placeholder: "Tell us briefly what you can contribute.",
+            required: true,
+            max_length: 500,
+          },
+        ],
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "q3",
+            label: "How active are you on Discord and CoC?",
+            style: 2,
+            placeholder: "Example: “4–5 hours a day”",
+            required: true,
+            max_length: 200,
+          },
+        ],
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 4,
+            custom_id: "q4",
+            label: "Anything else you’d like us to know?",
+            style: 2,
+            placeholder: "mention strengths, timezone, or special skills",
+            required: false,
+            max_length: 500,
+          },
+        ],
+      },
+    ],
+  };
+}
 </file>
 
 <file path="public/index.html">
@@ -1441,519 +982,6 @@ If you have ideas for the bot, or find any issues, you can create a pull request
 https://github.com/The-Best-Codes/discraft-js
 </file>
 
-<file path="REFACTOR_STATUS.md">
-# ✅ Refactoring Complete - Status Report
-
-## Overview
-Your codebase refactoring is **100% complete** and **production-ready**. All duplicate code has been centralized, build verification passed twice with zero errors.
-
----
-
-## 📊 What Was Done
-
-### New Files Created (3)
-| File | Lines | Purpose | Status |
-|------|-------|---------|--------|
-| **utils/config.ts** | 68 | Centralized IDs, Clans, Validation | ✅ Ready |
-| **utils/cocApi.ts** | 145 | Unified Clash of Clans API client | ✅ Ready |
-| **utils/discordApi.ts** | 228 | Unified Discord API helpers | ✅ Ready |
-
-### Existing Files Updated (3)
-| File | Changes | Status |
-|------|---------|--------|
-| **utils/recruitment.ts** | Import cocApi, remove hardcoded API constants | ✅ Done |
-| **utils/addHelper.ts** | Use config imports, maintain backward compatibility | ✅ Done |
-| **utils/linkHelper.ts** | Use cocApi + VALIDATION from config | ✅ Done |
-
-### Documentation Created (4)
-| File | Purpose |
-|------|---------|
-| REFACTORING_SUMMARY.md | Before/after comparison with benefits |
-| DEVELOPER_GUIDE.md | How to use new helpers with examples |
-| ARCHITECTURE.md | System design and module responsibilities |
-| COMPLETION_REPORT.md | High-level stakeholder summary |
-
----
-
-## 🎯 Key Improvements
-
-### Code Duplication Reduced
-- **Before**: ~200+ lines of duplicate code across multiple files
-- **After**: Single source of truth in config.ts + reusable helpers
-- **Reduction**: ~30% less code overall
-
-### Configuration Centralization
-```
-config.ts now contains:
-├── API_URLS (CoC API base, Discord API v10)
-├── ROLE_IDS (BOOM_MEMBER, WM, LE, ZP, CH, SP, VISITOR, VERIFIED)
-├── CHANNEL_IDS (All clan + utility channels)
-├── CLANS (5 clans with tags, names, role/channel mappings)
-└── VALIDATION (Player tag patterns + helper functions)
-```
-
-### API Client Unification
-```
-cocApi.ts provides:
-├── getPlayer(tag) → Fetch player data with validation
-├── getClan(tag) → Fetch clan data with error handling
-└── validateAndCleanTag(tag) → Tag validation/cleaning
-
-discordApi.ts provides:
-├── Role management (add/remove)
-├── Nickname updates
-├── Message operations (ephemeral, embeds, modals)
-└── Member data fetching
-```
-
----
-
-## ✅ Verification Results
-
-### Build Status
-```
-✅ Build 1: SUCCESSFUL
-   - Command: npm run build
-   - Result: Vercel build completed! Output: ./api
-   - Commands registered: 10/10
-   - Errors: 0
-
-✅ Build 2: SUCCESSFUL (Verification)
-   - Command: npm run build
-   - Result: Clean build, no regressions
-   - Errors: 0
-```
-
-### Files Status
-```
-✅ utils/config.ts           - Created and verified
-✅ utils/cocApi.ts           - Created and verified
-✅ utils/discordApi.ts       - Created and verified
-✅ utils/recruitment.ts      - Updated and tested
-✅ utils/addHelper.ts        - Updated and tested
-✅ utils/linkHelper.ts       - Updated and tested
-✅ All existing commands     - No breaking changes
-```
-
----
-
-## 🚀 Next Steps
-
-### Immediate (Ready Now)
-```bash
-npm run deploy  # Ship the refactored code to Vercel
-```
-
-### Future (Optional Enhancements)
-- Migrate commands to use `discordApi.ts` helpers
-  - player.ts can use cocApi for all player fetches
-  - link.ts can use discordApi for Discord operations
-  - add.ts can use discordApi for role/nickname management
-
-- Add integration tests for new helper modules
-
-- Add rate limiting/caching to cocApi
-
----
-
-## 📚 How to Use the New Modules
-
-### Import Centralized Config
-```typescript
-import { ROLE_IDS, CHANNEL_IDS, CLANS, VALIDATION } from './utils/config';
-
-// Use them directly
-const roleId = ROLE_IDS.VERIFIED;
-const channelId = CHANNEL_IDS.CLANS_LIST;
-const clanInfo = CLANS.WM;
-
-// Validation
-const { valid, cleanTag } = VALIDATION.isValidPlayerTag(userInput);
-```
-
-### Use CoC API Client
-```typescript
-import { cocApi } from './utils/cocApi';
-
-// Fetch player
-const result = await cocApi.getPlayer('#ABC123');
-if (result.success) {
-  console.log(result.data.name);
-} else {
-  console.error(result.message);
-}
-
-// Fetch clan
-const clanResult = await cocApi.getClan('#CLANTAGHERE');
-```
-
-### Use Discord API Helpers
-```typescript
-import { 
-  addMemberRole, 
-  setMemberNickname, 
-  sendEphemeralReply 
-} from './utils/discordApi';
-
-// Assign role
-await addMemberRole(guildId, userId, roleId, auditReason);
-
-// Update nickname
-await setMemberNickname(guildId, userId, nickname);
-
-// Send ephemeral message
-await sendEphemeralReply(interactionId, token, 'Hello!');
-```
-
----
-
-## 🔄 Backward Compatibility
-
-**100% Backward Compatible** ✅
-
-All changes maintain existing function signatures and behavior:
-- addHelper.ts still exports `IDS` and `CLAN_MAP`
-- linkHelper.ts maintains all function signatures
-- recruitment.ts maintains all public methods
-- No changes to command interfaces
-
-Existing code continues to work without modifications.
-
----
-
-## 📋 Refactoring Checklist
-
-- [x] Create config.ts with all IDs and clan definitions
-- [x] Create cocApi.ts with unified API client
-- [x] Create discordApi.ts with Discord helpers
-- [x] Update recruitment.ts to use new helpers
-- [x] Update addHelper.ts to use centralized config
-- [x] Update linkHelper.ts to use cocApi and config
-- [x] Verify build succeeds (0 errors)
-- [x] Verify backward compatibility
-- [x] Create comprehensive documentation
-- [x] Production ready ✅
-
----
-
-## 📞 Questions?
-
-See the detailed documentation:
-- **DEVELOPER_GUIDE.md** - How to use with code examples
-- **ARCHITECTURE.md** - System design and module relationships
-- **REFACTORING_SUMMARY.md** - Before/after comparison
-
----
-
-**Status**: ✅ **COMPLETE & READY FOR DEPLOYMENT**
-
-Last verified: This session (Build successful, 0 errors)
-
-Next action: `npm run deploy`
-</file>
-
-<file path="REFACTORING_SUMMARY.md">
-# Refactoring Summary: Code De-duplication & Centralization
-
-## Overview
-This refactoring consolidates duplicated configuration, API logic, and Discord helpers across the codebase into centralized, reusable modules. This improves maintainability, reduces duplication, and makes future updates easier.
-
----
-
-## New Files Created
-
-### 1. **utils/config.ts** - Centralized Configuration
-**Purpose**: Single source of truth for all IDs, clans, and API URLs
-
-**Contents**:
-- `API_URLS` - All API endpoints (CoC, Discord)
-- `ROLE_IDS` - All Discord role IDs in one place
-- `CHANNEL_IDS` - All Discord channel IDs
-- `CLANS` - Centralized clan definitions with type safety
-- `CLAN_TAGS`, `CLAN_NAMES` - Derived from CLANS for backward compatibility
-- `VALIDATION` - Player tag validation regex and helper functions
-- `GUILD_ID`, `MAIN_SERVER_ID`, `MAX_CLAN_SIZE` - Global constants
-
-**Benefits**:
-- ✅ No more magic strings scattered across files
-- ✅ Single update point for any ID changes
-- ✅ Type-safe clan definitions
-- ✅ Reusable validation functions
-
----
-
-### 2. **utils/cocApi.ts** - Clash of Clans API Handler
-**Purpose**: Centralized API client for all CoC API calls
-
-**Key Functions**:
-- `getPlayer(playerTag)` - Fetch player data with error handling
-- `getClan(clanTag)` - Fetch clan data with error handling
-- `validateAndCleanTag(tag)` - Validate and clean player tags
-
-**Benefits**:
-- ✅ Consistent error handling across all CoC API calls
-- ✅ Single place to update API URLs or authentication
-- ✅ Centralized player tag validation
-- ✅ Typed responses with success/error states
-
-**Usage Pattern**:
-```typescript
-const result = await cocApi.getPlayer(playerTag);
-if (result.success) {
-  // result.data contains player info
-} else {
-  // result.message contains error message
-}
-```
-
----
-
-### 3. **utils/discordApi.ts** - Discord API Helper
-**Purpose**: Centralized Discord API client for common operations
-
-**Key Functions**:
-- `sendEphemeralReply()` - Send ephemeral messages
-- `sendEphemeralEmbed()` - Send embeds as ephemeral
-- `deferReply()` / `deferMessageUpdate()` - Deferred responses
-- `updateMessage()` - Update previously sent messages
-- `showModal()` - Display modals
-- `sendChannelMessage()` - Post to channels
-- `addMemberRole()` / `removeMemberRole()` - Role management
-- `setMemberNickname()` - Update nicknames
-- `getMember()` / `createDmChannel()` - Member operations
-
-**Benefits**:
-- ✅ Eliminates repeated axios/fetch calls
-- ✅ Consistent error handling
-- ✅ Type-safe responses
-- ✅ Audit log reasons included
-
----
-
-## Files Updated
-
-### 1. **utils/recruitment.ts** - Refactored
-**Changes**:
-- Imports config from `config.ts` instead of hardcoding
-- Uses `cocApi.getClan()` instead of direct fetch calls
-- Uses `CLAN_TAGS` and `CLAN_NAMES` from config
-- Cleaner, simpler implementation
-
-**Before**:
-```typescript
-const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
-static CLAN_TAGS = { WM: 'REDACTED_WM_CLAN_TAG', ... }
-const response = await fetch(`${this.COC_API_BASE_URL}/clans/${encodedTag}`, { ... })
-```
-
-**After**:
-```typescript
-import { CLAN_TAGS, MAX_CLAN_SIZE } from "./config";
-import { cocApi } from "./cocApi";
-const result = await cocApi.getClan(clanTag);
-```
-
----
-
-### 2. **utils/addHelper.ts** - Refactored
-**Changes**:
-- Imports `CLANS`, `CHANNEL_IDS`, `ROLE_IDS` from config
-- Re-exports as `IDS` and `CLAN_MAP` for backward compatibility
-- References config values instead of hardcoding
-- Channel IDs use config constants
-
-**Benefits**:
-- ✅ No breaking changes to existing code
-- ✅ Single source of truth for IDs
-- ✅ Easy to update all IDs in one place
-
----
-
-### 3. **utils/linkHelper.ts** - Refactored
-**Changes**:
-- Imports `cocApi` instead of making direct fetch calls
-- Uses `VALIDATION` from config for tag validation
-- Uses `ROLE_IDS` from config instead of hardcoding
-- Uses `CHANNEL_IDS` for ticket channel reference
-- Cleaner error handling via cocApi
-
-**Before**:
-```typescript
-const cleanTag = playerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-if (!/^[A-Z0-9]{3,15}$/.test(cleanTag)) { ... }
-const response = await fetch(`${COC_API_BASE_URL}/players/%23${cleanTag}`, { ... })
-```
-
-**After**:
-```typescript
-const validation = VALIDATION.cleanPlayerTag(playerTag);
-if (!VALIDATION.isValidPlayerTag(validation)) { ... }
-const cocResult = await cocApi.getPlayer(cleanTag);
-```
-
----
-
-## Duplicate Reduction
-
-### Before Refactoring:
-- ❌ Player tag validation regex in multiple files
-- ❌ Role/Channel IDs duplicated across commands
-- ❌ CoC API fetch logic repeated 3+ times
-- ❌ Discord API axios calls scattered throughout
-- ❌ Error handling inconsistent
-- ❌ Config magic strings everywhere
-
-### After Refactoring:
-- ✅ Single validation function in config.ts
-- ✅ All IDs in ROLE_IDS and CHANNEL_IDS
-- ✅ Unified CoC API in cocApi.ts
-- ✅ Unified Discord API in discordApi.ts
-- ✅ Consistent error handling everywhere
-- ✅ No magic strings - all in config.ts
-
----
-
-## Backward Compatibility
-
-All refactoring maintains 100% backward compatibility:
-- `addHelper.ts` re-exports `IDS` and `CLAN_MAP` as before
-- Existing command imports continue to work
-- No API signatures changed for existing code
-- Soft migration - can use new helpers gradually
-
----
-
-## Usage Examples
-
-### Validate Player Tag
-```typescript
-import { VALIDATION } from "./utils/config";
-
-const validation = VALIDATION.cleanPlayerTag(userInput);
-if (!VALIDATION.isValidPlayerTag(validation)) {
-  // Invalid tag
-}
-```
-
-### Fetch Player from CoC API
-```typescript
-import { cocApi } from "./utils/cocApi";
-
-const result = await cocApi.getPlayer(playerTag);
-if (result.success) {
-  console.log(result.data.name); // Player name
-} else {
-  console.error(result.message); // Error message
-}
-```
-
-### Send Ephemeral Response
-```typescript
-import { sendEphemeralReply } from "./utils/discordApi";
-
-await sendEphemeralReply(interactionId, token, "Message content");
-```
-
-### Access Config
-```typescript
-import { CLANS, ROLE_IDS, CHANNEL_IDS } from "./utils/config";
-
-const clanWM = CLANS.WM; // Full clan info
-const roleId = ROLE_IDS.BOOM_MEMBER;
-const channelId = CHANNEL_IDS.ATTACK_PLANNING;
-```
-
----
-
-## Next Steps (Optional)
-
-Commands that could further benefit from these helpers:
-1. **link.ts** - Use `discordApi` for all Discord interactions
-2. **player.ts** - Use `cocApi` for player fetches
-3. **add.ts** - Use `discordApi` for all role/nick updates
-4. **postrecruit.ts** - Already uses updated `recruitment.ts`
-
-These are ready to migrate whenever needed - the infrastructure is now in place.
-
----
-
-## Testing Checklist
-
-- [ ] Player account linking still works (link.ts)
-- [ ] Clan member recruitment (add.ts) operates normally
-- [ ] Player stats display (player.ts) retrieves data correctly
-- [ ] Recruitment status updates (postrecruit.ts) fetches member counts
-- [ ] Unlink command works (unlink.ts)
-- [ ] All ID references still point to correct roles/channels
-
----
-
-## Summary
-
-**Total Reductions**:
-- Lines of duplicate code eliminated: **200+**
-- New reusable modules: **3**
-- Updated modules: **3**
-- Configuration centralization: **100%**
-- Backward compatibility: **100%**
-
-All changes maintain existing functionality while providing a clean foundation for future development.
-</file>
-
-<file path="scripts/register-guild.ts">
-// scripts/register-guild.ts
-import { configDotenv } from "dotenv";
-configDotenv();
-
-import {
-  REST,
-  type RESTPostAPIApplicationCommandsJSONBody,
-  Routes,
-} from "discord.js";
-import commands from "../.discraft/commands/index.ts";
-
-const token = process.env.DISCORD_TOKEN;
-const applicationId = process.env.DISCORD_APP_ID;
-const guildId = process.env.GUILD_ID; // Add this to your .env
-
-if (!token) {
-  console.error("DISCORD_TOKEN is not set in your environment variables.");
-  process.exit(1);
-}
-if (!applicationId) {
-  console.error("DISCORD_APP_ID is not set in your environment variables.");
-  process.exit(1);
-}
-if (!guildId) {
-  console.error("GUILD_ID is not set in your environment variables.");
-  process.exit(1);
-}
-
-const rest = new REST({ version: "10" }).setToken(token);
-const commandData = Object.values(commands).map((command) => command.data);
-
-(async () => {
-  try {
-    console.log(
-      `Started refreshing ${commandData.length} guild (/) commands for guild ${guildId}.`,
-    );
-
-    const data = (await rest.put(
-      Routes.applicationGuildCommands(applicationId, guildId),
-      {
-        body: commandData,
-      }
-    )) as RESTPostAPIApplicationCommandsJSONBody[];
-    
-    console.log(
-      `Successfully reloaded ${data.length} guild (/) commands.`,
-    );
-  } catch (error) {
-    console.error(error);
-  }
-})();
-</file>
-
 <file path="scripts/register.ts">
 import { configDotenv } from "dotenv";
 configDotenv();
@@ -2206,112 +1234,6 @@ class CocApi {
 }
 
 export const cocApi = new CocApi();
-</file>
-
-<file path="utils/config.ts">
-// utils/config.ts
-// Centralized configuration for all IDs, clans, and API URLs
-
-export const API_URLS = {
-  COC_API_BASE: "https://cocproxy.royaleapi.dev/v1",
-  DISCORD_API: "https://discord.com/api/v10"
-};
-
-export const ROLE_IDS = {
-  BOOM_MEMBER: "REDACTED_BOOM_MEMBER_ID",
-  WM: "REDACTED_WM_ID",
-  LE: "REDACTED_LE_ID",
-  ZP: "REDACTED_ZP_ID",
-  CH: "REDACTED_CH_ID",
-  SP: "REDACTED_SP_ID",
-  VISITOR: "REDACTED_VISITOR_ID",
-  VERIFIED: "REDACTED_VERIFIED_ID"
-};
-
-export const CHANNEL_IDS = {
-  WM: "REDACTED_CHANNEL_WM_ID",
-  LE: "REDACTED_CHANNEL_LE_ID",
-  ZP: "REDACTED_CHANNEL_ZP_ID",
-  CH: "REDACTED_CHANNEL_CH_ID",
-  SP: "REDACTED_CHANNEL_SP_ID",
-  CLANS_LIST: "REDACTED_CHANNEL_CLANS_LIST_ID",
-  ATTACK_PLANNING: "REDACTED_CHANNEL_ATTACK_PLANNING_ID",
-  FUN_CATEGORY: "REDACTED_CHANNEL_FUN_CATEGORY_ID",
-  CWL_SIGNUPS: "REDACTED_CHANNEL_CWL_SIGNUPS_ID",
-  BASE_VAULT: "REDACTED_CHANNEL_BASE_VAULT_ID",
-  SHOWCASE_BASE: "REDACTED_CHANNEL_SHOWCASE_BASE_ID",
-  VERIFICATION_CHANNEL: "REDACTED_CHANNEL_VERIFICATION_ID"
-};
-
-export interface ClanInfo {
-  abbr: string;
-  name: string;
-  roleId: string;
-  channelId: string;
-  tag: string;
-}
-
-export const CLANS: Record<string, ClanInfo> = {
-  WM: {
-    abbr: "WM",
-    name: "WAR MASTER",
-    roleId: ROLE_IDS.WM,
-    channelId: CHANNEL_IDS.WM,
-    tag: "REDACTED_WM_CLAN_TAG"
-  },
-  LE: {
-    abbr: "LE",
-    name: "LEGENDS",
-    roleId: ROLE_IDS.LE,
-    channelId: CHANNEL_IDS.LE,
-    tag: "REDACTED_LE_CLAN_TAG"
-  },
-  ZP: {
-    abbr: "ZP",
-    name: "ZwartePiet",
-    roleId: ROLE_IDS.ZP,
-    channelId: CHANNEL_IDS.ZP,
-    tag: "REDACTED_ZP_CLAN_TAG"
-  },
-  CH: {
-    abbr: "CH",
-    name: "Clash Heros",
-    roleId: ROLE_IDS.CH,
-    channelId: CHANNEL_IDS.CH,
-    tag: "REDACTED_CH_CLAN_TAG"
-  },
-  SP: {
-    abbr: "SP",
-    name: "SP.OPS.DIVISION",
-    roleId: ROLE_IDS.SP,
-    channelId: CHANNEL_IDS.SP,
-    tag: "REDACTED_SP_CLAN_TAG"
-  }
-};
-
-export const CLAN_LIST = Object.values(CLANS);
-export const CLAN_TAGS = Object.fromEntries(
-  Object.entries(CLANS).map(([key, clan]) => [key, clan.tag])
-);
-export const CLAN_NAMES = Object.fromEntries(
-  Object.entries(CLANS).map(([key, clan]) => [key, clan.name])
-);
-
-export const GUILD_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
-export const MAIN_SERVER_ID = GUILD_ID;
-export const MAX_CLAN_SIZE = 50;
-
-// Validation patterns
-export const VALIDATION = {
-  PLAYER_TAG_PATTERN: /^[A-Z0-9]{3,15}$/,
-  cleanPlayerTag: (tag: string): string => {
-    return tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-  },
-  isValidPlayerTag: (tag: string): boolean => {
-    const cleanTag = VALIDATION.cleanPlayerTag(tag);
-    return VALIDATION.PLAYER_TAG_PATTERN.test(cleanTag);
-  }
-};
 </file>
 
 <file path="utils/discordApi.ts">
@@ -2689,35 +1611,6 @@ export async function createDmChannel(userId: string): Promise<DiscordApiRespons
 <file path="utils/logger.ts">
 import consola from "consola";
 export { consola as logger };
-</file>
-
-<file path="cleanup-kv.js">
-// Create a temporary cleanup script (run once)
-import { kv } from '@vercel/kv';
-
-async function cleanupRecruitmentData() {
-  try {
-    // Delete the old structure
-    await kv.del('boom_house_recruitment');
-    console.log('✅ Old recruitment data cleared');
-    
-    // Reinitialize with new structure
-    const defaultClans = {
-      WM: { clan: 'WM', name: 'WAR MASTER', memberCount: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_WM_CLAN_TAG' },
-      LE: { clan: 'LE', name: 'LEGENDS', memberCount: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_LE_CLAN_TAG' },
-      ZP: { clan: 'ZP', name: 'ZwartePiet', memberCount: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_ZP_CLAN_TAG' },
-      CH: { clan: 'CH', name: 'Clash Heros', memberCount: 0, lastUpdated: Date.now(), clanTag: 'REDACTED_CH_CLAN_TAG' },
-    };
-    
-    await kv.hset('boom_house_recruitment', defaultClans);
-    console.log('✅ New recruitment structure initialized');
-    
-  } catch (error) {
-    console.error('<a:redcross:1439044567415521443> Cleanup failed:', error);
-  }
-}
-
-cleanupRecruitmentData();
 </file>
 
 <file path="commands/chat.ts">
@@ -3201,89 +2094,6 @@ export default {
 };
 </file>
 
-<file path="full-cleanup.js">
-import { config } from 'dotenv';
-config();
-
-const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.DISCORD_APP_ID;
-const GUILD_ID = process.env.GUILD_ID; // This might be missing
-
-if (!TOKEN || !CLIENT_ID) {
-  console.error('Missing required environment variables');
-  console.error('DISCORD_TOKEN:', TOKEN ? '***' : 'MISSING');
-  console.error('DISCORD_APP_ID:', CLIENT_ID || 'MISSING');
-  process.exit(1);
-}
-
-console.log('DISCORD_APP_ID:', CLIENT_ID);
-console.log('GUILD_ID:', GUILD_ID || 'NOT SET - will only clean global commands');
-
-async function cleanupAllCommands() {
-  try {
-    console.log('Starting comprehensive command cleanup...');
-    
-    // Clean global commands (always do this)
-    console.log('\n🗑️  Cleaning GLOBAL commands...');
-    await cleanupCommandScope(`https://discord.com/api/v10/applications/${CLIENT_ID}/commands`);
-    
-    // Clean guild commands (only if GUILD_ID is available)
-    if (GUILD_ID) {
-      console.log('\n🗑️  Cleaning GUILD commands...');
-      await cleanupCommandScope(`https://discord.com/api/v10/applications/${CLIENT_ID}/guilds/${GUILD_ID}/commands`);
-    } else {
-      console.log('\n⚠️  GUILD_ID not set - skipping guild command cleanup');
-      console.log('💡 If duplicates persist, set GUILD_ID in your .env file');
-    }
-    
-    console.log('\n🎉 Cleanup complete!');
-    console.log('🚀 Now run: npm run build');
-    
-  } catch (error) {
-    console.error('Error during cleanup:', error.message);
-  }
-}
-
-async function cleanupCommandScope(url) {
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bot ${TOKEN}`,
-      },
-    });
-
-    if (!response.ok) {
-      console.log(`<a:redcross:1439044567415521443> No commands found or access denied at: ${url}`);
-      return;
-    }
-
-    const commands = await response.json();
-    console.log(`Found ${commands.length} commands to delete...`);
-
-    for (const command of commands) {
-      const deleteUrl = `${url}/${command.id}`;
-      const deleteResponse = await fetch(deleteUrl, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bot ${TOKEN}`,
-        },
-      });
-
-      if (deleteResponse.ok) {
-        console.log(`✅ Deleted: ${command.name} (${command.id})`);
-      } else {
-        console.log(`<a:redcross:1439044567415521443> Failed to delete: ${command.name}`);
-      }
-    }
-  } catch (error) {
-    console.error(`Error cleaning scope ${url}:`, error.message);
-  }
-}
-
-cleanupAllCommands();
-</file>
-
 <file path="utils/addHelper.ts">
 import { CLANS, CHANNEL_IDS, ROLE_IDS } from "./config";
 import type { ClanInfo } from "./config";
@@ -3511,6 +2321,115 @@ export function createForceAddResultContent(
     `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`
   );
 }
+</file>
+
+<file path="utils/config.ts">
+// utils/config.ts
+// Centralized configuration for all IDs, clans, and API URLs
+
+export const API_URLS = {
+  COC_API_BASE: "https://cocproxy.royaleapi.dev/v1",
+  DISCORD_API: "https://discord.com/api/v10"
+};
+
+export const ROLE_IDS = {
+  BOOM_MEMBER: "REDACTED_BOOM_MEMBER_ID",
+  WM: "REDACTED_WM_ID",
+  LE: "REDACTED_LE_ID",
+  ZP: "REDACTED_ZP_ID",
+  CH: "REDACTED_CH_ID",
+  SP: "REDACTED_SP_ID",
+  TICKET_JOIN_LEADERSHIP_ROLE: "REDACTED_TICKET_JOIN_LEADERSHIP_ID",   // Role mentioned in join‑clan welcome
+  TICKET_STAFF_LEADERSHIP_ROLE: "REDACTED_TICKET_STAFF_LEADERSHIP_ID",  // Role mentioned in staff‑related tickets
+  VISITOR: "REDACTED_VISITOR_ID",
+  VERIFIED: "REDACTED_VERIFIED_ID"
+};
+
+export const CHANNEL_IDS = {
+  WM: "REDACTED_CHANNEL_WM_ID",
+  LE: "REDACTED_CHANNEL_LE_ID",
+  ZP: "REDACTED_CHANNEL_ZP_ID",
+  CH: "REDACTED_CHANNEL_CH_ID",
+  SP: "REDACTED_CHANNEL_SP_ID",
+  CLANS_LIST: "REDACTED_CHANNEL_CLANS_LIST_ID",
+  ATTACK_PLANNING: "REDACTED_CHANNEL_ATTACK_PLANNING_ID",
+  FUN_CATEGORY: "REDACTED_CHANNEL_FUN_CATEGORY_ID",
+  CWL_SIGNUPS: "REDACTED_CHANNEL_CWL_SIGNUPS_ID",
+  TICKET_CATEGORY: "REDACTED_CHANNEL_TICKET_CATEGORY_ID",
+  BASE_VAULT: "REDACTED_CHANNEL_BASE_VAULT_ID",
+  SHOWCASE_BASE: "REDACTED_CHANNEL_SHOWCASE_BASE_ID",
+  VERIFICATION_CHANNEL: "REDACTED_CHANNEL_VERIFICATION_ID"
+};
+
+export interface ClanInfo {
+  abbr: string;
+  name: string;
+  roleId: string;
+  channelId: string;
+  tag: string;
+}
+
+export const CLANS: Record<string, ClanInfo> = {
+  WM: {
+    abbr: "WM",
+    name: "WAR MASTER",
+    roleId: ROLE_IDS.WM,
+    channelId: CHANNEL_IDS.WM,
+    tag: "REDACTED_WM_CLAN_TAG"
+  },
+  LE: {
+    abbr: "LE",
+    name: "LEGENDS",
+    roleId: ROLE_IDS.LE,
+    channelId: CHANNEL_IDS.LE,
+    tag: "REDACTED_LE_CLAN_TAG"
+  },
+  ZP: {
+    abbr: "ZP",
+    name: "ZwartePiet",
+    roleId: ROLE_IDS.ZP,
+    channelId: CHANNEL_IDS.ZP,
+    tag: "REDACTED_ZP_CLAN_TAG"
+  },
+  CH: {
+    abbr: "CH",
+    name: "Clash Heros",
+    roleId: ROLE_IDS.CH,
+    channelId: CHANNEL_IDS.CH,
+    tag: "REDACTED_CH_CLAN_TAG"
+  },
+  SP: {
+    abbr: "SP",
+    name: "SP.OPS.DIVISION",
+    roleId: ROLE_IDS.SP,
+    channelId: CHANNEL_IDS.SP,
+    tag: "REDACTED_SP_CLAN_TAG"
+  }
+};
+
+export const CLAN_LIST = Object.values(CLANS);
+export const CLAN_TAGS = Object.fromEntries(
+  Object.entries(CLANS).map(([key, clan]) => [key, clan.tag])
+);
+export const CLAN_NAMES = Object.fromEntries(
+  Object.entries(CLANS).map(([key, clan]) => [key, clan.name])
+);
+
+export const GUILD_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
+export const MAIN_SERVER_ID = GUILD_ID;
+export const MAX_CLAN_SIZE = 50;
+
+// Validation patterns
+export const VALIDATION = {
+  PLAYER_TAG_PATTERN: /^[A-Z0-9]{3,15}$/,
+  cleanPlayerTag: (tag: string): string => {
+    return tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  },
+  isValidPlayerTag: (tag: string): boolean => {
+    const cleanTag = VALIDATION.cleanPlayerTag(tag);
+    return VALIDATION.PLAYER_TAG_PATTERN.test(cleanTag);
+  }
+};
 </file>
 
 <file path="utils/linkHelper.ts">
@@ -6113,7 +5032,7 @@ export default {
         fields: [
           {
             name: "<a:rg_blink:1456183866510282762> Quick Navigation",
-            value: "Verified? [**Click here to Create a Ticket**](https://discord.com/channels/REDACTED_GUILD_ID/REDACTED_CHANNEL_VERIFICATION_ID/1439260029328031776)",
+            value: "Verified? [**Click here to Create a Ticket**](https://discord.com/channels/REDACTED_GUILD_ID/REDACTED_CHANNEL_VERIFICATION_ID/REDACTED_MSG_ID)",
             inline: false
           }
         ],
