@@ -20,6 +20,7 @@ export default {
     name: "closeticket",
     description: "Close this ticket with confirmation",
     type: ApplicationCommandType.ChatInput,
+    initialEphemeral: true,
     default_member_permissions: PermissionFlagsBits.ManageChannels.toString(),
   } as CommandData,
 

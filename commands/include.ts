@@ -21,6 +21,7 @@ export default {
     name: "include",
     description: "Add a user to this ticket channel",
     type: ApplicationCommandType.ChatInput,
+    initialEphemeral: true,
     default_member_permissions: PermissionFlagsBits.ManageChannels.toString(),
     options: [
       {

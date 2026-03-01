@@ -143,10 +143,13 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
 
       if (!userId || !channelId || !guildId) return;
 
-      // Defer the button press
+      // Defer ephemerally so status/errors stay private
       await axios.post(
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-        { type: InteractionResponseType.DeferredMessageUpdate }
+        {
+          type: InteractionResponseType.DeferredChannelMessageWithSource,
+          data: { flags: MessageFlags.Ephemeral },
+        }
       );
 
       try {
