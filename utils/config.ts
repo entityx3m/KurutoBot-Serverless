@@ -13,6 +13,7 @@ export const ROLE_IDS = {
   ZP: "REDACTED_ZP_ID",
   CH: "REDACTED_CH_ID",
   SP: "REDACTED_SP_ID",
+  WA: "REDACTED_WA_ID",
   TICKET_JOIN_LEADERSHIP_ROLE: "REDACTED_TICKET_JOIN_LEADERSHIP_ID",   // Role mentioned in join‑clan welcome
   TICKET_STAFF_LEADERSHIP_ROLE: "REDACTED_TICKET_STAFF_LEADERSHIP_ID",  // Role mentioned in staff‑related tickets
   VISITOR: "REDACTED_VISITOR_ID",
@@ -25,6 +26,7 @@ export const CHANNEL_IDS = {
   ZP: "REDACTED_CHANNEL_ZP_ID",
   CH: "REDACTED_CHANNEL_CH_ID",
   SP: "REDACTED_CHANNEL_SP_ID",
+  WA: "REDACTED_CHANNEL_WA_ID",
   CLANS_LIST: "REDACTED_CHANNEL_CLANS_LIST_ID",
   ATTACK_PLANNING: "REDACTED_CHANNEL_ATTACK_PLANNING_ID",
   FUN_CATEGORY: "REDACTED_CHANNEL_FUN_CATEGORY_ID",
@@ -78,6 +80,13 @@ export const CLANS: Record<string, ClanInfo> = {
     roleId: ROLE_IDS.SP,
     channelId: CHANNEL_IDS.SP,
     tag: "REDACTED_SP_CLAN_TAG"
+  },
+  WA: {                                           // New clan
+    abbr: "WA",
+    name: "War Addiction",
+    roleId: ROLE_IDS.WA,
+    channelId: CHANNEL_IDS.WA,
+    tag: "REDACTED_WA_CLAN_TAG"
   }
 };
 

@@ -3,21 +3,38 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-
-// Here you define your command data
-// Discraft will handle the registration and interactions with the API
+import axios from "axios";
 
 export default {
   data: {
-    name: "ping", // The name of the command
-    description: "Check if the bot is online", // The description of the command
+    name: "ping", 
+    description: "Check if the bot and Flask API are online",
   } as CommandData,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   async execute(data: {
     interaction: SimplifiedInteraction;
   }): CommandExecuteResult {
-    return {
-      content: "Pong from Vercel!", // The message content
-    };
+    const flaskUrl = process.env.FLASK_API_URL;
+
+    if (!flaskUrl) {
+      return {
+        content: `🏓 **Pong!**\n**Bot Status:** Online\n**Flask API:** ⚠️ Not configured (set FLASK_API_URL env var)`,
+      };
+    }
+
+    try {
+      // 1. Interoperability in action: The Bot (Node) calls the API (Python)
+      const response = await axios.get(`${flaskUrl}/status`);
+      const flaskData = response.data;
+
+      return {
+        content: `🏓 **Pong!**\n**Bot Status:** Online (Vercel)\n**Flask API:** 🟢 ${flaskData.bot_status} (v${flaskData.version})`,
+      };
+    } catch (error) {
+      // Fallback if the Python script isn't running or reachable
+      return {
+        content: `🏓 **Pong!**\n**Bot Status:** Online\n**Flask API:** 🔴 Offline (is your Python app running and reachable at ${flaskUrl}?)`,
+      };
+    }
   },
 };

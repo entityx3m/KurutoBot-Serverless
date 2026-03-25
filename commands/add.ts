@@ -60,7 +60,8 @@ export default {
           { name: "LE (LEGENDS)", value: "LE" },
           { name: "ZP (ZwartePiet)", value: "ZP" },
           { name: "CH (Clash Heros)", value: "CH" },
-          { name: "SP (SP.OPS.DIVISION)", value: "SP" }
+          { name: "SP (SP.OPS.DIVISION)", value: "SP" },
+          { name: "WA (War Addiction)", value: "WA" }
         ]
       },
       {
