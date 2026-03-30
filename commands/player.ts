@@ -10,7 +10,7 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-import { getUserData, setUserData } from "../utils/kvHelper";
+import { getUserData, setUserData } from "../utils/dbHelper";
 import axios from "axios";
 
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";

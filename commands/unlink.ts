@@ -12,7 +12,7 @@ import type {
   SimplifiedInteraction,
   ComponentHandler,
 } from "../utils/types";
-import { getUserData, setUserData } from "../utils/kvHelper";
+import { getUserData, setUserData } from "../utils/dbHelper";
 
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";

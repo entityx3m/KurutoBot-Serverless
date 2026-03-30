@@ -15,11 +15,8 @@ import type {
 import { 
   getUserData, 
   setUserData, 
-  getMainAccount,
-  getUserIdByTag,
-  linkTagToUser,
-  type PlayerAccount
-} from "../utils/kvHelper";
+  getMainAccount
+} from "../utils/dbHelper";
 import { linkPlayerAccount } from "../utils/linkHelper";
 import {
   IDS,

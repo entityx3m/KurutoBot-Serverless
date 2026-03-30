@@ -1,6 +1,6 @@
 // utils/linkHelper.ts
-import type { PlayerAccount, UserData } from "./kvHelper";
-import { getUserData, setUserData, getUserIdByTag, linkTagToUser } from "./kvHelper";
+import type { PlayerAccount, UserData } from "./dbHelper";
+import { getUserData, setUserData, getUserIdByTag } from "./dbHelper";
 import { cocApi } from "./cocApi";
 import { VALIDATION, ROLE_IDS, CHANNEL_IDS } from "./config";
 
@@ -126,9 +126,14 @@ export async function linkPlayerAccount(
       userData.mainAccountTag = cleanTag;
     }
 
-    // Save user data and create reverse mapping
-    await setUserData(userId, userData);
-    await linkTagToUser(cleanTag, userId);
+    // Save user and account state to relational tables.
+    const saved = await setUserData(userId, userData);
+    if (!saved) {
+      return {
+        success: false,
+        message: `<a:redcross:1439044567415521443> **Linking Failed**\nFailed to save linked account data. Please try again.`
+      };
+    }
 
     console.log(`✅ Linked account #${cleanTag} to ${discordUsername}`);
 

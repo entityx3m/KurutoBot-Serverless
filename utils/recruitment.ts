@@ -1,8 +1,8 @@
 // utils/recruitment.ts
 import { configDotenv } from "dotenv";
-import { kv } from "@vercel/kv";
 import { CLAN_TAGS, CLAN_NAMES, MAX_CLAN_SIZE } from "./config";
 import { cocApi } from "./cocApi";
+import { supabase } from "./db";
 
 configDotenv();
 
@@ -15,36 +15,85 @@ export interface ClanRecruitment {
 }
 
 export class RecruitmentTracker {
-  private static readonly KEY = "boom_house_recruitment";
+  private static readonly TABLE = "clan_recruitment";
   private static readonly MAX_CLAN_SIZE = MAX_CLAN_SIZE;
+
+  private static isMissingTableError(error: any): boolean {
+    return error?.code === "PGRST205";
+  }
+
+  private static rowToModel(row: any): ClanRecruitment {
+    const lastUpdatedValue = row.last_updated;
+    const lastUpdated =
+      typeof lastUpdatedValue === "number"
+        ? lastUpdatedValue
+        : new Date(lastUpdatedValue || Date.now()).getTime();
+
+    return {
+      clan: row.clan,
+      name: row.name,
+      memberCount: row.member_count ?? 0,
+      lastUpdated,
+      clanTag: row.clan_tag || undefined,
+    };
+  }
+
+  private static modelToRow(model: ClanRecruitment) {
+    return {
+      clan: model.clan,
+      name: model.name,
+      member_count: model.memberCount,
+      last_updated: new Date(model.lastUpdated).toISOString(),
+      clan_tag: model.clanTag || null,
+    };
+  }
 
   static async initialize(): Promise<void> {
     try {
-      // Get existing data
-      const existingData =
-        (await kv.hgetall<Record<string, ClanRecruitment>>(this.KEY)) || {};
+      const { data: existingRows, error: existingError } = await supabase
+        .from(this.TABLE)
+        .select("*");
+
+      if (existingError) {
+        if (this.isMissingTableError(existingError)) {
+          console.warn(`⚠️ Table ${this.TABLE} is missing. Run the Supabase migration SQL before using recruitment tracker.`);
+          return;
+        }
+        console.error("❌ Failed to load recruitment tracker rows:", existingError);
+        return;
+      }
+
+      const existingData = new Map(
+        (existingRows || []).map((row) => [String(row.clan).toUpperCase(), row])
+      );
 
       // Define all required clans
       const requiredClans = Object.keys(CLAN_TAGS);
-      let needsUpdate = false;
+      const rowsToUpsert: any[] = [];
 
-      // Check if any clans are missing from KV and add them
+      // Check if any clans are missing and add them
       for (const clanKey of requiredClans) {
-        if (!existingData[clanKey]) {
+        if (!existingData.has(clanKey.toUpperCase())) {
           console.log(`🆕 Initializing missing clan: ${clanKey}`);
-          existingData[clanKey] = {
+          rowsToUpsert.push({
             clan: clanKey,
             name: CLAN_NAMES[clanKey as keyof typeof CLAN_NAMES],
-            memberCount: 0,
-            lastUpdated: Date.now(),
-            clanTag: CLAN_TAGS[clanKey as keyof typeof CLAN_TAGS]
-          };
-          needsUpdate = true;
+            member_count: 0,
+            last_updated: new Date().toISOString(),
+            clan_tag: CLAN_TAGS[clanKey as keyof typeof CLAN_TAGS],
+          });
         }
       }
 
-      if (needsUpdate) {
-        await kv.hset(this.KEY, existingData);
+      if (rowsToUpsert.length > 0) {
+        const { error: upsertError } = await supabase
+          .from(this.TABLE)
+          .upsert(rowsToUpsert, { onConflict: "clan" });
+
+        if (upsertError) {
+          console.error("❌ Failed to initialize recruitment tracker rows:", upsertError);
+          return;
+        }
         console.log("✅ Recruitment tracker updated with new clans");
       }
     } catch (error) {
@@ -82,7 +131,15 @@ export class RecruitmentTracker {
                 clan.name = CLAN_NAMES[clan.clan as keyof typeof CLAN_NAMES];
               }
 
-              await kv.hset(this.KEY, { [clan.clan.toUpperCase()]: clan });
+              const { error: updateError } = await supabase
+                .from(this.TABLE)
+                .upsert(this.modelToRow(clan), { onConflict: "clan" });
+
+              if (updateError) {
+                console.warn(`⚠️ Failed updating ${clan.name} in Supabase:`, updateError);
+                continue;
+              }
+
               console.log(
                 `✅ Updated ${clan.name}: ${memberCount}/50 members`
               );
@@ -101,11 +158,21 @@ export class RecruitmentTracker {
 
   static async getClan(clan: string): Promise<ClanRecruitment | null> {
     try {
-      const data = await kv.hget<ClanRecruitment>(
-        this.KEY,
-        clan.toUpperCase()
-      );
-      return data;
+      const { data, error } = await supabase
+        .from(this.TABLE)
+        .select("*")
+        .eq("clan", clan.toUpperCase())
+        .maybeSingle();
+
+      if (error) {
+        if (this.isMissingTableError(error)) {
+          return null;
+        }
+        console.error(`❌ Failed to get clan ${clan}:`, error);
+        return null;
+      }
+
+      return data ? this.rowToModel(data) : null;
     } catch (error) {
       console.error(`❌ Failed to get clan ${clan}:`, error);
       return null;
@@ -114,13 +181,23 @@ export class RecruitmentTracker {
 
   static async getAllClans(): Promise<ClanRecruitment[]> {
     try {
-      const data =
-        await kv.hgetall<Record<string, ClanRecruitment>>(this.KEY);
+      const { data, error } = await supabase
+        .from(this.TABLE)
+        .select("*");
+
+      if (error) {
+        if (this.isMissingTableError(error)) {
+          return [];
+        }
+        console.error("❌ Failed to get all clans:", error);
+        return [];
+      }
+
       // Sort clans to keep order consistent
       const clanOrder = Object.keys(CLAN_TAGS);
 
       return data
-        ? Object.values(data).sort((a, b) => {
+        ? data.map((row) => this.rowToModel(row)).sort((a, b) => {
             return clanOrder.indexOf(a.clan) - clanOrder.indexOf(b.clan);
           })
         : [];
@@ -171,5 +248,7 @@ export class RecruitmentTracker {
   }
 }
 
-// Initialize on import to ensure new clans are added to KV on restart
-RecruitmentTracker.initialize().catch(console.error);
+// Initialize eagerly only when Supabase env is available at import time.
+if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+  RecruitmentTracker.initialize().catch(console.error);
+}

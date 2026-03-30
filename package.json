@@ -9,16 +9,19 @@
     "deploy": "vercel --prod",
     "build": "discraft vercel build",
     "register": "tsx scripts/register.ts",
-    "register-guild": "tsx scripts/register-guild.ts"
+    "register-guild": "tsx scripts/register-guild.ts",
+    "migrate:kv-to-supabase": "tsx scripts/migrate-kv-to-supabase.ts",
+    "migrate:kv-to-supabase:apply": "tsx scripts/migrate-kv-to-supabase.ts --apply"
   },
   "devDependencies": {
+    "@vercel/kv": "^3.0.0",
     "discraft": "^1.7.9",
     "typescript": "^5.9.3",
     "vercel": "^50.32.5"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@vercel/kv": "^3.0.0",
+    "@supabase/supabase-js": "^2.100.1",
     "@vercel/node": "^5.3.26",
     "axios": "^1.12.2",
     "consola": "^3.4.2",

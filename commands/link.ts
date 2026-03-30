@@ -11,7 +11,7 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-import { getUserData, setUserData, getUserIdByTag, linkTagToUser, type UserData, type PlayerAccount } from "../utils/kvHelper";
+import { getUserData } from "../utils/dbHelper";
 import { linkPlayerAccount } from "../utils/linkHelper";
 
 const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
