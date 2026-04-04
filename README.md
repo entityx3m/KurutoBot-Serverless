@@ -168,4 +168,4 @@ npm run migrate:kv-to-supabase:apply
 
 ## License
 
-No license file is currently included. Add a LICENSE before broad public reuse.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for the full text.
