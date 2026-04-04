@@ -6,7 +6,6 @@ bun.lock
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
-REDACTED_OUTPUT
 .env
 .discraft
 .vercel
