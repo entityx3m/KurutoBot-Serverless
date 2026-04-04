@@ -11,8 +11,7 @@ import type {
 } from "../utils/types";
 import { RecruitmentTracker } from "../utils/recruitment";
 import axios from "axios";
-
-const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
+import { MAIN_SERVER_ID } from "../utils/config";
 
 export default {
   data: {

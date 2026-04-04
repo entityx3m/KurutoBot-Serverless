@@ -11,10 +11,14 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-import { ROLE_IDS } from "../utils/config";
+import { MAIN_SERVER_ID } from "../utils/config";
+import { canManageTicket, getTicketContext } from "../utils/ticketHelper";
 
-const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
-const TICKET_CATEGORY = process.env.TICKET_CATEGORY || "REDACTED_CHANNEL_TICKET_CATEGORY_ID";
+type InteractionOption = { name: string; value: string };
+
+function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
+  return options?.find((opt) => opt.name === name)?.value;
+}
 
 export default {
   data: {
@@ -57,10 +61,8 @@ export default {
       };
     }
 
-    // Get target user from options
-    const options = interaction.data.options || [];
-    const userOption = options.find((opt) => opt.name === "user") as any;
-    const targetUserId = userOption?.value;
+    const options = interaction.data.options as InteractionOption[] | undefined;
+    const targetUserId = getOptionValue(options, "user");
     if (!targetUserId) {
       return {
         content: "<a:redcross:1439044567415521443> Please specify a user.",
@@ -69,18 +71,8 @@ export default {
     }
 
     try {
-      // Fetch channel to verify it's a ticket
-      const channelRes = await fetch(
-        `https://discord.com/api/v10/channels/${channelId}`,
-        {
-          headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
-        }
-      );
-      if (!channelRes.ok) throw new Error("Could not fetch channel");
-      const channel = await channelRes.json();
-
-      // Check if channel is in ticket category
-      if (channel.parent_id !== TICKET_CATEGORY) {
+      const ticketContext = await getTicketContext(channelId);
+      if (!ticketContext) {
         return {
           content:
             "<a:redcross:1439044567415521443> This command can only be used inside a ticket channel.",
@@ -88,34 +80,7 @@ export default {
         };
       }
 
-      const topic = channel.topic || "";
-      const creatorMatch = topic.match(/creator:(\d+)/);
-      const typeMatch = topic.match(/type:(\w+)/);
-      const creatorId = creatorMatch ? creatorMatch[1] : null;
-      const ticketType = typeMatch ? typeMatch[1] : null;
-
-      // Determine required staff role based on ticket type
-      let requiredRole = null;
-      if (ticketType === "apply_join") {
-        requiredRole = ROLE_IDS.TICKET_JOIN_LEADERSHIP_ROLE;
-      } else if (ticketType === "chat_staff" || ticketType === "apply_staff") {
-        requiredRole = ROLE_IDS.TICKET_STAFF_LEADERSHIP_ROLE;
-      }
-
-      // Check permissions: creator or staff role
-      let hasPermission = userId === creatorId;
-      if (!hasPermission && requiredRole) {
-        const memberRes = await fetch(
-          `https://discord.com/api/v10/guilds/${guildId}/members/${userId}`,
-          {
-            headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
-          }
-        );
-        if (memberRes.ok) {
-          const member = await memberRes.json();
-          hasPermission = member.roles?.includes(requiredRole);
-        }
-      }
+      const hasPermission = await canManageTicket(guildId, userId, ticketContext);
 
       if (!hasPermission) {
         return {

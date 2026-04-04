@@ -1,128 +1,171 @@
-# Discraft Vercel + TypeScript + AI Template
+# BOOM House Discord Bot
 
-### **Check out the [Vercel Deployment Guide](https://bestcodes.dev/blog/how-to-deploy-a-discord-bot-to-vercel) for a more detailed, step-by-step guide.**
+Production Discord bot for BOOM House (Clash of Clans alliance), built for server operations, recruitment workflow, account verification, and ticket handling.
 
-Let's get started creating a serverless Discord bot with Discraft and Vercel!
-This template leverages TypeScript and Google AI for enhanced functionality.
+## Project Status
 
-**Note:** If you came here after running `discraft init` with the Vercel template, you can skip to the 'Configuring Google AI' section.
+- Active and maintained
+- Production-focused
+- Designed for Vercel deployment (serverless)
 
-## Prerequisites
+## What This Bot Does
 
-Before you begin, make sure you have the following installed:
+This bot manages the full BOOM House member lifecycle:
 
-- [Node.js](https://nodejs.org/en/download/) (preferably version 18.x or higher)
-- [Vercel CLI](https://vercel.com/cli)
-- [Discraft CLI](https://github.com/The-Best-Codes/discraft-js)
+- Clash account linking and identity verification
+- Recruitment acceptance flow with role assignment and welcome automation
+- Ticket intake and moderation workflows
+- Player profile lookups and account management
+- Clan recruitment dashboard posting
 
-## Getting Started
+It is optimized for one Discord community with configurable IDs (guild, roles, channels) through environment variables.
 
-First, create a new directory for your project and navigate to it:
+## Tech Stack
+
+- Runtime: Node.js + TypeScript
+- Bot framework: Discraft
+- Discord APIs: discord-api-types + direct REST calls
+- Storage: Supabase (users/accounts)
+- Hosting: Vercel
+- AI command: Google Generative AI (Gemini)
+
+## Repository Structure
+
+```text
+commands/    Slash commands and component handlers
+utils/       Shared helpers (config, db, discord API wrappers, type utilities)
+scripts/     Command registration and migration scripts
+api/         Vercel endpoint entry
+public/      Static assets
+```
+
+## Main Commands
+
+- /add: accept a member into a BOOM clan (roles, nickname, welcome flow)
+- /link: link a Clash of Clans account to a Discord member
+- /unlink: unlink one of a member's Clash accounts
+- /player: inspect linked accounts or lookup any player by tag
+- /postticket: post ticket entry panel
+- /closeticket: close active ticket channels with confirmation
+- /include: add additional users to active ticket channels
+- /postrecruit: post/update recruitment summary embed
+- /postlink: post account-linking panel
+- /chat: AI assistant persona command
+
+## Setup
+
+### 1. Install dependencies
 
 ```bash
-mkdir my-discraft-project
-cd my-discraft-project
+npm install
 ```
 
-Now, initialize a new Discraft project, choosing the Vercel template:
+### 2. Create environment file
 
 ```bash
-discraft init
-? Select a template:
-  TypeScript
-  JavaScript
-❯ Vercel + TypeScript + Google AI
+copy .env.example .env
 ```
 
-This will create a new project with a structure something like this:
+Fill in all required variables (see Environment Variables section below).
 
-```
-my-discraft-project/
-├── commands/
-│   ├── chat.ts
-│   └── ping.ts
-├── public/
-│   └── index.html
-├── scripts/
-│   └── register.ts
-├── utils/
-│   ├── logger.ts
-│   └── types.ts
-├── .env.example
-├── .gitignore
-├── .vercelignore
-├── index.ts
-├── package.json
-├── README.md
-├── tsconfig.json
-└── vercel.json
+### 3. Register slash commands
+
+```bash
+npm run register
 ```
 
-## Configuring Google AI
+### 4. Build for Vercel
 
-This template utilizes the Google AI API for enhanced bot interactions. You'll need to create a Google AI project and obtain an API key. Here's how to configure it:
-
-1. **Obtain API Key:** Visit the [Google AI Studio](https://aistudio.google.com/app/apikey) and obtain an API key.
-2. **Select a Model:** Choose a suitable Google AI model. A good starting point is `gemini-2.0-flash-exp`, as it is currently free, but other models may be appropriate for your needs. You can find available models [here](https://ai.google.dev/models).
-3. **Environment Variables:** The project relies on several environment variables to function correctly. You will need to set these in your `.env` file locally and in the Vercel project settings.
-   - Create a `.env` file in your project's root directory.
-   - Copy the contents of the `.env.example` file, filling in the values with your Discord and Google AI credentials.
-
-Here's what the `.env.example` looks like:
-
-```example
-# You will need to add these secrets to the 'Environment Variables' section of your Vercel project
-# https://vercel.com/docs/projects/environment-variables
-
-# From `General Information > Public Key` | https://discord.com/developers/applications
-DISCORD_PUBLIC_KEY=''
-# From `General Information > App ID` | https://discord.com/developers/applications
-DISCORD_APP_ID=''
-# From `Bot > Token` | https://discord.com/developers/applications
-DISCORD_TOKEN=''
-
-# From `Get API Key` | https://aistudio.google.com/app/apikey
-GOOGLE_AI_API_KEY=''
-# From the Google model list
-GOOGLE_AI_MODEL='gemini-2.0-flash-exp'
+```bash
+npm run build
 ```
 
-**Important:** _Do not commit the `.env` file to your repository._ It should be added to your `.gitignore` file. This is already done for you in the template.
+### 5. Deploy
 
-## Deploying to Vercel
+```bash
+npm run deploy
+```
 
-1. **Create a Vercel Project:** If you haven't already, create a new project in your Vercel dashboard.
-2. **Set Environment Variables:** In your Vercel project settings, go to "Environment Variables" and add all the variables you configured in your `.env`. You can find the project settings [here](https://vercel.com/dashboard).
-3. **Run a Discraft Build**: In your project directory, run `npm run build` or `discraft vercel build` to create the API routes and files for your bot.
-4. **Deploy:** You can deploy your bot to Vercel by running `npm run deploy` in your project directory.
+## Environment Variables
 
-## Discord Bot Setup
+The application now uses fail-fast config for critical values. Missing required values will cause startup/runtime errors instead of silent fallbacks.
 
-### Create a Discord Application
+### Required
 
-1. **Create a Discord Application:** Go to the [Discord Developer Portal](https://discord.com/developers/applications) and create a new application.
-2. **Add a Bot User:** Add a bot user to your application.
-3. **Invite the Bot:** Use the 'OAuth2 > URL Generator' section to create an invite link and add your bot to a server. Select the `applications.commands` scope and send this link to a discord server you own so you can see your bot in action.
+| Variable | Purpose |
+| --- | --- |
+| DISCORD_PUBLIC_KEY | Verifies Discord interaction signatures |
+| DISCORD_APP_ID | Discord application ID |
+| DISCORD_TOKEN | Bot token for Discord REST operations |
+| GUILD_ID | Main BOOM House guild ID |
+| COC_API_KEY | Clash of Clans API token |
+| GOOGLE_AI_API_KEY | Gemini API key for /chat |
+| SUPABASE_URL | Supabase project URL |
+| SUPABASE_ANON_KEY | Supabase key used by app reads/writes |
+| ROLE_BOOM_MEMBER_ID | BOOM member role ID |
+| ROLE_WM_ID | War Master role ID |
+| ROLE_LE_ID | Legends role ID |
+| ROLE_ZP_ID | ZwartePiet role ID |
+| ROLE_CH_ID | Clash Heros role ID |
+| ROLE_SP_ID | SP.OPS.DIVISION role ID |
+| ROLE_WA_ID | War Addiction role ID |
+| ROLE_TICKET_JOIN_LEADERSHIP_ID | Staff role for join-clan ticket actions |
+| ROLE_TICKET_STAFF_LEADERSHIP_ID | Staff role for staff/chat ticket actions |
+| ROLE_VISITOR_ID | Visitor role ID |
+| ROLE_VERIFIED_ID | Verified role ID |
+| CHANNEL_WM_ID | WM channel ID |
+| CHANNEL_LE_ID | LE channel ID |
+| CHANNEL_ZP_ID | ZP channel ID |
+| CHANNEL_CH_ID | CH channel ID |
+| CHANNEL_SP_ID | SP channel ID |
+| CHANNEL_WA_ID | WA channel ID |
+| CHANNEL_CLANS_LIST_ID | Clan list channel ID |
+| CHANNEL_ATTACK_PLANNING_ID | Attack planning channel ID |
+| CHANNEL_FUN_CATEGORY_ID | Fun category/channel ID |
+| CHANNEL_CWL_SIGNUPS_ID | CWL signups channel ID |
+| CHANNEL_TICKET_CATEGORY_ID | Ticket category ID |
+| CHANNEL_BASE_VAULT_ID | Base vault channel ID |
+| CHANNEL_SHOWCASE_BASE_ID | Showcase base channel ID |
+| CHANNEL_VERIFICATION_ID | Verification channel ID |
 
-### Change the Bot's Interactions Endpoint URL
+### Optional
 
-1. **Go to the Bot's Application Page:** Go to the [Discord Developer Portal](https://discord.com/developers/applications) and select your bot's application.
-2. **Go to the General Information Tab.**
-3. **Set the Interactions Endpoint URL:** In the Interactions Endpoint URL field, enter the URL of your bot's API endpoint. This should be the URL of your Vercel deployment, followed by `/api`.
+| Variable | Purpose |
+| --- | --- |
+| FLASK_API_URL | Optional endpoint used by /ping |
+| SUPABASE_SERVICE_ROLE_KEY | Needed for migration/admin scripts |
+| MIGRATION_KV_PREFIX | Optional key prefix override for KV migration |
 
-## Example Commands
+## Data Model (High Level)
 
-This template comes with a couple of example commands:
+- users table: Discord-centric profile metadata
+- accounts table: linked Clash accounts keyed by player tag
+- one main account per Discord user
 
-- **`/ping`**: Responds with "Pong!".
-- **`/chat <prompt>`**: Uses Google AI to respond to the given prompt.
+Migration helper:
 
-## Get Help & See Demos
+```bash
+npm run migrate:kv-to-supabase
+npm run migrate:kv-to-supabase:apply
+```
 
-Need some assistance or want to see the bot in action? Join our Discord community!
-[Discraft Support Discord](https://discord.gg/86qMjn4RHQ)
+## Security Notes
 
-## Contribute
+- Never commit .env
+- Rotate credentials immediately if exposed
+- Use Vercel project environment variables for production
+- Keep bot token, CoC API key, and Supabase service key private
 
-If you have ideas for the bot, or find any issues, you can create a pull request or issue on our github here:
-https://github.com/The-Best-Codes/discraft-js
+## Scripts
+
+```bash
+npm run build
+npm run register
+npm run deploy
+npm run migrate:kv-to-supabase
+npm run migrate:kv-to-supabase:apply
+```
+
+## License
+
+No license file is currently included. Add a LICENSE before broad public reuse.

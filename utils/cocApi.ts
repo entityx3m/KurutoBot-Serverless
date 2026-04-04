@@ -50,13 +50,22 @@ export type CocApiResponse<T> = CocApiSuccess<T> | CocApiError;
 
 class CocApi {
   private baseUrl = API_URLS.COC_API_BASE;
-  private apiKey = process.env.COC_API_KEY || "";
+  private apiKey = process.env.COC_API_KEY;
 
   /**
    * Get player data from Clash of Clans API
    */
   async getPlayer(playerTag: string): Promise<CocApiResponse<PlayerData>> {
     try {
+      if (!this.apiKey) {
+        return {
+          success: false,
+          status: 500,
+          statusText: "Internal Server Error",
+          message: "Missing required environment variable: COC_API_KEY"
+        };
+      }
+
       const cleanTag = VALIDATION.cleanPlayerTag(playerTag);
       
       if (!VALIDATION.isValidPlayerTag(cleanTag)) {
@@ -113,6 +122,15 @@ class CocApi {
    */
   async getClan(clanTag: string): Promise<CocApiResponse<ClanData>> {
     try {
+      if (!this.apiKey) {
+        return {
+          success: false,
+          status: 500,
+          statusText: "Internal Server Error",
+          message: "Missing required environment variable: COC_API_KEY"
+        };
+      }
+
       const cleanTag = VALIDATION.cleanPlayerTag(clanTag);
       
       const response = await fetch(`${this.baseUrl}/clans/%23${cleanTag}`, {

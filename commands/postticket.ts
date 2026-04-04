@@ -17,14 +17,13 @@ import {
   sendChannelMessage,
   getMember,
 } from "../utils/discordApi";
-import { ROLE_IDS, CHANNEL_IDS } from "../utils/config";
+import { ROLE_IDS, CHANNEL_IDS, MAIN_SERVER_ID } from "../utils/config";
 
 // Role IDs used for ticket permissions (you can also put these in config)
-const JOIN_LEADERSHIP_ROLE = ROLE_IDS.TICKET_JOIN_LEADERSHIP_ROLE || "REDACTED_TICKET_JOIN_LEADERSHIP_ID";
-const STAFF_LEADERSHIP_ROLE = ROLE_IDS.TICKET_STAFF_LEADERSHIP_ROLE || "REDACTED_TICKET_STAFF_LEADERSHIP_ID";
+const JOIN_LEADERSHIP_ROLE = ROLE_IDS.TICKET_JOIN_LEADERSHIP_ROLE;
+const STAFF_LEADERSHIP_ROLE = ROLE_IDS.TICKET_STAFF_LEADERSHIP_ROLE;
 const TICKET_CATEGORY = CHANNEL_IDS.TICKET_CATEGORY; // must be set in config
 
-const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
 const VERIFIED_ROLE_ID = ROLE_IDS.VERIFIED;
 
 export default {

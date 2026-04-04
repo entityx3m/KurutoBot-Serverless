@@ -1,40 +1,48 @@
 // utils/config.ts
 // Centralized configuration for all IDs, clans, and API URLs
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value || !value.trim()) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 export const API_URLS = {
   COC_API_BASE: "https://cocproxy.royaleapi.dev/v1",
   DISCORD_API: "https://discord.com/api/v10"
 };
 
 export const ROLE_IDS = {
-  BOOM_MEMBER: "REDACTED_BOOM_MEMBER_ID",
-  WM: "REDACTED_WM_ID",
-  LE: "REDACTED_LE_ID",
-  ZP: "REDACTED_ZP_ID",
-  CH: "REDACTED_CH_ID",
-  SP: "REDACTED_SP_ID",
-  WA: "REDACTED_WA_ID",
-  TICKET_JOIN_LEADERSHIP_ROLE: "REDACTED_TICKET_JOIN_LEADERSHIP_ID",   // Role mentioned in join‑clan welcome
-  TICKET_STAFF_LEADERSHIP_ROLE: "REDACTED_TICKET_STAFF_LEADERSHIP_ID",  // Role mentioned in staff‑related tickets
-  VISITOR: "REDACTED_VISITOR_ID",
-  VERIFIED: "REDACTED_VERIFIED_ID"
+  BOOM_MEMBER: requireEnv("ROLE_BOOM_MEMBER_ID"),
+  WM: requireEnv("ROLE_WM_ID"),
+  LE: requireEnv("ROLE_LE_ID"),
+  ZP: requireEnv("ROLE_ZP_ID"),
+  CH: requireEnv("ROLE_CH_ID"),
+  SP: requireEnv("ROLE_SP_ID"),
+  WA: requireEnv("ROLE_WA_ID"),
+  TICKET_JOIN_LEADERSHIP_ROLE: requireEnv("ROLE_TICKET_JOIN_LEADERSHIP_ID"),
+  TICKET_STAFF_LEADERSHIP_ROLE: requireEnv("ROLE_TICKET_STAFF_LEADERSHIP_ID"),
+  VISITOR: requireEnv("ROLE_VISITOR_ID"),
+  VERIFIED: requireEnv("ROLE_VERIFIED_ID")
 };
 
 export const CHANNEL_IDS = {
-  WM: "REDACTED_CHANNEL_WM_ID",
-  LE: "REDACTED_CHANNEL_LE_ID",
-  ZP: "REDACTED_CHANNEL_ZP_ID",
-  CH: "REDACTED_CHANNEL_CH_ID",
-  SP: "REDACTED_CHANNEL_SP_ID",
-  WA: "REDACTED_CHANNEL_WA_ID",
-  CLANS_LIST: "REDACTED_CHANNEL_CLANS_LIST_ID",
-  ATTACK_PLANNING: "REDACTED_CHANNEL_ATTACK_PLANNING_ID",
-  FUN_CATEGORY: "REDACTED_CHANNEL_FUN_CATEGORY_ID",
-  CWL_SIGNUPS: "REDACTED_CHANNEL_CWL_SIGNUPS_ID",
-  TICKET_CATEGORY: "REDACTED_CHANNEL_TICKET_CATEGORY_ID",
-  BASE_VAULT: "REDACTED_CHANNEL_BASE_VAULT_ID",
-  SHOWCASE_BASE: "REDACTED_CHANNEL_SHOWCASE_BASE_ID",
-  VERIFICATION_CHANNEL: "REDACTED_CHANNEL_VERIFICATION_ID"
+  WM: requireEnv("CHANNEL_WM_ID"),
+  LE: requireEnv("CHANNEL_LE_ID"),
+  ZP: requireEnv("CHANNEL_ZP_ID"),
+  CH: requireEnv("CHANNEL_CH_ID"),
+  SP: requireEnv("CHANNEL_SP_ID"),
+  WA: requireEnv("CHANNEL_WA_ID"),
+  CLANS_LIST: requireEnv("CHANNEL_CLANS_LIST_ID"),
+  ATTACK_PLANNING: requireEnv("CHANNEL_ATTACK_PLANNING_ID"),
+  FUN_CATEGORY: requireEnv("CHANNEL_FUN_CATEGORY_ID"),
+  CWL_SIGNUPS: requireEnv("CHANNEL_CWL_SIGNUPS_ID"),
+  TICKET_CATEGORY: requireEnv("CHANNEL_TICKET_CATEGORY_ID"),
+  BASE_VAULT: requireEnv("CHANNEL_BASE_VAULT_ID"),
+  SHOWCASE_BASE: requireEnv("CHANNEL_SHOWCASE_BASE_ID"),
+  VERIFICATION_CHANNEL: requireEnv("CHANNEL_VERIFICATION_ID")
 };
 
 export interface ClanInfo {
@@ -98,7 +106,7 @@ export const CLAN_NAMES = Object.fromEntries(
   Object.entries(CLANS).map(([key, clan]) => [key, clan.name])
 );
 
-export const GUILD_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
+export const GUILD_ID = requireEnv("GUILD_ID");
 export const MAIN_SERVER_ID = GUILD_ID;
 export const MAX_CLAN_SIZE = 50;
 

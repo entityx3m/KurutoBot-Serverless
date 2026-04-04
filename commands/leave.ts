@@ -9,6 +9,12 @@ import type {
   SimplifiedInteraction,
 } from "../utils/types";
 
+type InteractionOption = { name: string; value: string };
+
+function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
+  return options?.find((opt) => opt.name === name)?.value;
+}
+
 const OWNER_ID = "REDACTED_OWNER_ID"; // Same ID as above!
 
 export default {
@@ -35,11 +41,8 @@ export default {
       };
     }
 
-    const serverIdOption = interaction.data.options?.find(
-      (opt: any) => opt.name === "server_id"
-    ) as any;
-    
-    const serverId = serverIdOption?.value;
+    const options = interaction.data.options as InteractionOption[] | undefined;
+    const serverId = getOptionValue(options, "server_id");
 
     if (!serverId) {
       return {

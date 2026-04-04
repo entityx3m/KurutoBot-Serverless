@@ -28,11 +28,16 @@ import {
   createNormalAddResultContent,
   createForceAddResultContent
 } from "../utils/addHelper";
+import { API_URLS, MAIN_SERVER_ID, ROLE_IDS } from "../utils/config";
+import { addMemberRole, setMemberNickname } from "../utils/discordApi";
 
-// Guild ID check constant
-const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
-const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
-const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
+const COC_API_BASE_URL = API_URLS.COC_API_BASE;
+
+type InteractionOption = { name: string; value: string };
+
+function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
+  return options?.find((opt) => opt.name === name)?.value;
+}
 
 export default {
   data: {
@@ -92,20 +97,17 @@ export default {
 
     const chatInteraction = interaction;
 
-    // Find options
-    const memberOption = chatInteraction.data.options?.find(
-      (option) => option.name === "member"
-    ) as any;
-    const clanOption = chatInteraction.data.options?.find(
-      (option) => option.name === "clan"
-    ) as any;
-    const playerTagOption = chatInteraction.data.options?.find(
-      (option) => option.name === "player_tag"
-    ) as any;
+    const options = chatInteraction.data.options as InteractionOption[] | undefined;
+    const memberId = getOptionValue(options, "member");
+    const clan = getOptionValue(options, "clan");
+    const rawPlayerTag = getOptionValue(options, "player_tag");
 
-    const memberId = memberOption?.value;
-    const clan = clanOption?.value;
-    const rawPlayerTag = playerTagOption?.value;
+    if (!memberId || !clan) {
+      return {
+        content: "<a:redcross:1439044567415521443> Missing required command options.",
+        flags: MessageFlags.Ephemeral,
+      };
+    }
 
     // Check for linked account if no player_tag provided
     let playerTag: string;
@@ -240,16 +242,12 @@ export default {
       const nickname = `${playerName} | ${clanInfo.abbr}`;
       
       try {
-        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json',
-            'X-Audit-Log-Reason': auditReason
-          },
-          body: JSON.stringify({ nick: nickname }),
-        });
-        console.log(`✅ Set nickname for ${memberId} to "${nickname}"`);
+        const nicknameResult = await setMemberNickname(guildId, memberId, nickname, auditReason);
+        if (!nicknameResult.success) {
+          console.warn(`⚠️ Could not set nickname for ${memberId}: ${nicknameResult.error}`);
+        } else {
+          console.log(`✅ Set nickname for ${memberId} to "${nickname}"`);
+        }
       } catch (nicknameError) {
         console.warn(`⚠️ Could not set nickname for ${memberId}:`, nicknameError);
         // Continue even if nickname fails
@@ -258,19 +256,17 @@ export default {
       // ASSIGN VERIFIED ROLE
       let verifiedAssigned = false;
       try {
-        const verifiedRoleResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${VERIFIED_ROLE_ID}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json',
-            'X-Audit-Log-Reason': `Account added to ${clanInfo.name} by ${commanderName}`
-          },
-        });
-        if (verifiedRoleResponse.ok) {
+        const verifiedRoleResult = await addMemberRole(
+          guildId,
+          memberId,
+          ROLE_IDS.VERIFIED,
+          `Account added to ${clanInfo.name} by ${commanderName}`
+        );
+        if (verifiedRoleResult.success) {
           verifiedAssigned = true;
           console.log(`✅ Assigned Verified role to ${memberUser.username}`);
         } else {
-          console.warn(`⚠️ Failed to assign Verified role to ${memberUser.username}: ${verifiedRoleResponse.statusText}`);
+          console.warn(`⚠️ Failed to assign Verified role to ${memberUser.username}: ${verifiedRoleResult.error}`);
         }
       } catch (roleError) {
         console.warn(`⚠️ Could not assign Verified role to ${memberId}:`, roleError);
@@ -281,31 +277,17 @@ export default {
       const visitorMessage = getVisitorMessage(visitorStatus);
 
       // Assign BOOM Member role
-      const boomRoleResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${IDS.ROLES.BOOM_MEMBER}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-Audit-Log-Reason': auditReason
-        },
-      });
+      const boomRoleResponse = await addMemberRole(guildId, memberId, IDS.ROLES.BOOM_MEMBER, auditReason);
 
-      if (!boomRoleResponse.ok) {
-        throw new Error(`Failed to assign BOOM Member role: ${boomRoleResponse.statusText}`);
+      if (!boomRoleResponse.success) {
+        throw new Error(`Failed to assign BOOM Member role: ${boomRoleResponse.error}`);
       }
 
       // Assign clan role
-      const clanRoleResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${clanInfo.role}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-Audit-Log-Reason': auditReason
-        },
-      });
+      const clanRoleResponse = await addMemberRole(guildId, memberId, clanInfo.role, auditReason);
 
-      if (!clanRoleResponse.ok) {
-        throw new Error(`Failed to assign clan role: ${clanRoleResponse.statusText}`);
+      if (!clanRoleResponse.success) {
+        throw new Error(`Failed to assign clan role: ${clanRoleResponse.error}`);
       }
 
       // Send DM and clan welcome using helpers
@@ -431,29 +413,17 @@ export default {
         await setUserData(memberId, userData);
 
         // Assign BOOM Member role
-        const boomRoleResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${IDS.ROLES.BOOM_MEMBER}`, {
-          method: "PUT",
-          headers: {
-            "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
-            "X-Audit-Log-Reason": auditReason,
-          },
-        });
+        const boomRoleResponse = await addMemberRole(guildId, memberId, IDS.ROLES.BOOM_MEMBER, auditReason);
 
-        if (!boomRoleResponse.ok) {
-          throw new Error(`Failed to assign BOOM Member role: ${boomRoleResponse.statusText}`);
+        if (!boomRoleResponse.success) {
+          throw new Error(`Failed to assign BOOM Member role: ${boomRoleResponse.error}`);
         }
 
         // Assign clan role
-        const clanRoleResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${memberId}/roles/${clanInfo.role}`, {
-          method: "PUT",
-          headers: {
-            "Authorization": `Bot ${process.env.DISCORD_TOKEN}`,
-            "X-Audit-Log-Reason": auditReason,
-          },
-        });
+        const clanRoleResponse = await addMemberRole(guildId, memberId, clanInfo.role, auditReason);
 
-        if (!clanRoleResponse.ok) {
-          throw new Error(`Failed to assign clan role: ${clanRoleResponse.statusText}`);
+        if (!clanRoleResponse.success) {
+          throw new Error(`Failed to assign clan role: ${clanRoleResponse.error}`);
         }
 
         // Process visitor role using helper

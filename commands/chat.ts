@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
-  type APIApplicationCommandOption,
   ApplicationCommandOptionType,
   ApplicationCommandType,
   MessageFlags,
@@ -10,6 +9,12 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
+
+type InteractionOption = { name: string; value: string };
+
+function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
+  return options?.find((opt) => opt.name === name)?.value;
+}
 
 // Kuruto's Edgy Unhinged Personality System Prompt
 const KURUTO_PERSONALITY = `You are Kuruto, the edgy unhinged creator of the BOOM House Discord bot named "Kuruto bot" which is hosted in vercel. This is your vibe:
@@ -125,20 +130,11 @@ export default {
       };
     }
 
-    // Cast the interaction to the correct type
-    const chatInteraction = interaction;
-
-    // Find the 'prompt' option from the interaction
-    const promptOption = chatInteraction.data.options?.find(
-      (option) => option.name === "prompt",
-    ) as (APIApplicationCommandOption & { value: string }) | undefined;
-    // Find the 'image' option from the interaction
-    const imageOption = chatInteraction.data.options?.find(
-      (option) => option.name === "image",
-    ) as (APIApplicationCommandOption & { value: string }) | undefined;
-    const prompt = promptOption?.value || ""; // Get the value of the prompt option
+    const options = interaction.data.options as InteractionOption[] | undefined;
+    const prompt = getOptionValue(options, "prompt") || "";
+    const imageId = getOptionValue(options, "image");
     const imageAttachment =
-      chatInteraction.data.resolved?.attachments?.[imageOption?.value || ""]; // Get the image attachment details from the resolved data
+      interaction.data.resolved?.attachments?.[imageId || ""];
 
     // Check if the prompt exceeds the maximum length
     if (prompt.length > 2000) {
@@ -157,8 +153,16 @@ export default {
     }
 
     try {
+      const googleAiApiKey = process.env.GOOGLE_AI_API_KEY;
+      if (!googleAiApiKey) {
+        return {
+          content: "Missing required environment variable: GOOGLE_AI_API_KEY",
+          flags: MessageFlags.Ephemeral,
+        };
+      }
+
       // Initialize the Google Generative AI client
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || "");
+      const genAI = new GoogleGenerativeAI(googleAiApiKey);
       
       // Use gemini-2.5-flash
       const model = genAI.getGenerativeModel({

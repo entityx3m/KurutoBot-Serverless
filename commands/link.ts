@@ -13,9 +13,13 @@ import type {
 } from "../utils/types";
 import { getUserData } from "../utils/dbHelper";
 import { linkPlayerAccount } from "../utils/linkHelper";
+import { MAIN_SERVER_ID } from "../utils/config";
 
-const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
-const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
+type InteractionOption = { name: string; value: string };
+
+function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
+  return options?.find((opt) => opt.name === name)?.value;
+}
 
 export default {
   data: {
@@ -43,10 +47,8 @@ export default {
       };
     }
 
-    const options = interaction.data.options || [];
-    const playerTagOption = options.find((opt: any) => opt.name === "player_tag");
-    
-    const rawPlayerTag = playerTagOption?.value;
+    const options = interaction.data.options as InteractionOption[] | undefined;
+    const rawPlayerTag = getOptionValue(options, "player_tag");
     if (typeof rawPlayerTag !== "string" || !rawPlayerTag) {
       return {
         content: "<a:redcross:1439044567415521443> Please provide your player tag.\n\nExample: `/link player_tag:#ABC123`",
@@ -128,7 +130,7 @@ export default {
         content: successMessage,
       };
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error in link command:', error);
       return {
         content: `<a:redcross:1439044567415521443> **Linking Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -251,13 +253,13 @@ export default {
 
       // Extract player tag from modal
       let playerTag = "";
-      components.forEach((row: any) => {
-        row.components.forEach((component: any) => {
+      for (const row of components) {
+        for (const component of row.components) {
           if (component.custom_id === "player_tag_input") {
             playerTag = component.value || "";
           }
-        });
-      });
+        }
+      }
 
       if (!playerTag) {
         await axios.post(

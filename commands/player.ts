@@ -11,20 +11,69 @@ import type {
   SimplifiedInteraction,
 } from "../utils/types";
 import { getUserData, setUserData } from "../utils/dbHelper";
+import type { PlayerAccount, UserData } from "../utils/dbHelper";
 import axios from "axios";
+import { API_URLS, MAIN_SERVER_ID } from "../utils/config";
+import { setMemberNickname } from "../utils/discordApi";
 
-const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
-const COC_API_BASE_URL = "https://cocproxy.royaleapi.dev/v1";
+const COC_API_BASE_URL = API_URLS.COC_API_BASE;
+
+type InteractionOption = { name: string; value: string };
+type ExternalPlayerData = {
+  name?: string;
+  townHallLevel?: number;
+  expLevel?: number;
+  warStars?: number;
+  trophies?: number;
+  bestTrophies?: number;
+  warPreference?: string;
+  role?: string;
+  clan?: { name?: string; tag?: string };
+  leagueTier?: {
+    name?: string;
+    iconUrls?: { large?: string };
+  };
+};
+
+function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
+  return options?.find((opt) => opt.name === name)?.value;
+}
+
+function cleanPlayerTag(rawTag: string): string {
+  return rawTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function getLeagueName(account: PlayerAccount): string {
+  if (!account.leagueTier) {
+    return "Unranked";
+  }
+
+  if (typeof account.leagueTier === "string") {
+    return account.leagueTier;
+  }
+
+  return account.leagueTier.name || "Unranked";
+}
 
 // Helper function to render player stats with secure component IDs
 async function renderPlayerStats(
   playerTag: string,
-  userData: any,
+  userData: UserData,
   isSelf: boolean,
   ownerId: string
 ) {
   // Fetch fresh API data
-  let playerData = userData.accounts.find((acc: any) => acc.playerTag === playerTag) as any;
+  const selectedAccount = userData.accounts.find((acc) => acc.playerTag === playerTag) || userData.accounts[0];
+  let playerData: ExternalPlayerData = {
+    name: selectedAccount.playerName,
+    townHallLevel: selectedAccount.townHallLevel,
+    expLevel: selectedAccount.expLevel,
+    clan: selectedAccount.clan,
+    leagueTier:
+      typeof selectedAccount.leagueTier === "object"
+        ? selectedAccount.leagueTier
+        : undefined,
+  };
   
   try {
     const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
@@ -41,9 +90,16 @@ async function renderPlayerStats(
   }
 
   const titlePrefix = isSelf ? "Your" : "Their";
-  const mainAccount = userData.accounts.find((acc: any) => acc.isMain) || userData.accounts[0];
+  const mainAccount = userData.accounts.find((acc) => acc.isMain) || userData.accounts[0];
   
-  const embed: any = {
+  const embed: {
+    title: string;
+    color: number;
+    thumbnail?: { url: string };
+    fields: Array<{ name: string; value: string; inline: boolean }>;
+    footer: { text: string };
+    timestamp: string;
+  } = {
     title: `📊 ${titlePrefix} Player Stats`,
     color: 0x5865F2,
     thumbnail: playerData.leagueTier?.iconUrls?.large ? { url: playerData.leagueTier.iconUrls.large } : undefined,
@@ -53,7 +109,7 @@ async function renderPlayerStats(
       { name: "⭐ Status", value: mainAccount.playerTag === playerTag ? "Main Account" : "Linked Account", inline: true },
       { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel || mainAccount.townHallLevel}`, inline: true },
       { name: "📊 Experience", value: `Level ${playerData.expLevel || mainAccount.expLevel}`, inline: true },
-      { name: "🏆 League", value: playerData.leagueTier?.name || mainAccount.leagueTier || "Unranked", inline: true },
+      { name: "🏆 League", value: playerData.leagueTier?.name || getLeagueName(mainAccount), inline: true },
     ],
     footer: {
       text: isSelf
@@ -109,7 +165,7 @@ async function renderPlayerStats(
 
   // Only show buttons if the user is viewing their own profile (isSelf)
   if (userData.accounts.length > 1 && isSelf) {
-    const options = userData.accounts.map((acc: any) => ({
+    const options = userData.accounts.map((acc) => ({
       label: `${acc.playerName} (TH${acc.townHallLevel})`,
       value: acc.playerTag,
       default: acc.playerTag === playerTag,
@@ -127,7 +183,7 @@ async function renderPlayerStats(
       }]
     });
 
-    const currentAccount = userData.accounts.find((acc: any) => acc.playerTag === playerTag);
+    const currentAccount = userData.accounts.find((acc) => acc.playerTag === playerTag);
     if (currentAccount && !currentAccount.isMain) {
       components.push({
         type: 1,
@@ -181,12 +237,10 @@ export default {
       };
     }
 
-    const options = interaction.data.options || [];
-    const tagOption = options.find((opt: any) => opt.name === "tag");
-    const userOption = options.find((opt: any) => opt.name === "user");
-    
-    const rawTag = tagOption?.value;
-    const targetUserId = (userOption?.value || interaction.member?.user?.id) as string | undefined;
+    const options = interaction.data.options as InteractionOption[] | undefined;
+    const rawTag = getOptionValue(options, "tag");
+    const selectedUserId = getOptionValue(options, "user");
+    const targetUserId = selectedUserId || interaction.member?.user?.id;
     if (!targetUserId) {
       return {
         content: "<a:redcross:1439044567415521443> Could not identify the target user.",
@@ -195,7 +249,7 @@ export default {
     }
     
     // Get target user
-    const targetUser = userOption 
+    const targetUser = selectedUserId
       ? interaction.data.resolved?.users?.[String(targetUserId)]
       : interaction.member?.user;
     
@@ -208,7 +262,7 @@ export default {
 
     // CASE 1: Looking up by tag (any player)
     if (rawTag) {
-      const playerTag = rawTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const playerTag = cleanPlayerTag(rawTag);
       
       try {
         const response = await fetch(`${COC_API_BASE_URL}/players/%23${playerTag}`, {
@@ -225,7 +279,7 @@ export default {
           };
         }
 
-        const playerData = await response.json();
+        const playerData = (await response.json()) as ExternalPlayerData;
         
         const embed = {
           title: `👤 ${playerData.name} (#${playerTag})`,
@@ -292,87 +346,7 @@ export default {
 
     const mainAccount = userData.accounts.find((acc) => acc.isMain) || userData.accounts[0];
     const isSelf = targetUserId === interaction.member?.user?.id;
-    
-    // Fetch fresh API data
-    let playerData = mainAccount as any;
-    try {
-      const response = await fetch(`${COC_API_BASE_URL}/players/%23${mainAccount.playerTag}`, {
-        headers: { 
-          'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
-          'Accept': 'application/json' 
-        },
-      });
-      if (response.ok) {
-        playerData = await response.json();
-      }
-    } catch (error) {
-      console.warn("Failed to fetch fresh data:", error);
-    }
 
-    const titlePrefix = isSelf ? "Your" : `${targetUser.username}'s`;
-    const embed: any = {
-      title: `📊 ${titlePrefix} Player Stats`,
-      color: 0x5865F2,
-      thumbnail: playerData.leagueTier?.iconUrls?.large ? { url: playerData.leagueTier.iconUrls.large } : undefined,
-      fields: [
-        { name: "👤 CoC Name", value: playerData.name || mainAccount.playerName, inline: true },
-        { name: "🏷️ Player Tag", value: `#${mainAccount.playerTag}`, inline: true },
-        { name: "⭐ Status", value: mainAccount.isMain ? "Main Account" : "Linked Account", inline: true },
-        { name: "🏰 Town Hall", value: `Level ${playerData.townHallLevel || mainAccount.townHallLevel}`, inline: true },
-        { name: "📊 Experience", value: `Level ${playerData.expLevel || mainAccount.expLevel}`, inline: true },
-        { name: "🏆 League", value: playerData.leagueTier?.name || mainAccount.leagueTier || "Unranked", inline: true },
-      ],
-      footer: {
-        text: isSelf 
-          ? `You have ${userData.accounts.length} linked account${userData.accounts.length > 1 ? 's' : ''}` 
-          : `${targetUser.username} has ${userData.accounts.length} linked account${userData.accounts.length > 1 ? 's' : ''}` 
-      },
-      timestamp: new Date().toISOString()
-    };
-    
-    if (playerData.clan || mainAccount.clan) {
-      const clan = playerData.clan || mainAccount.clan;
-      embed.fields.push({ 
-        name: "👑 Current Clan", 
-        value: `${clan?.name} (${clan?.tag})`, 
-        inline: false 
-      });
-    }
-    
-    // Add BOOM House info if available
-    if (userData.clan) {
-      const clanMap = {
-        WM: "WAR MASTER",
-        LE: "LEGENDS", 
-        ZP: "ZwartePiet",
-        CH: "Clash Heros",
-        SP: "SP.OPS.DIVISION"
-      };
-      
-      embed.fields.push({ 
-        name: "🏰 BOOM House", 
-        value: `${clanMap[userData.clan as keyof typeof clanMap] || userData.clan}`, 
-        inline: false 
-      });
-    }
-    
-    if (userData.recruitedAt) {
-      const date = new Date(userData.recruitedAt).toLocaleDateString();
-      embed.fields.push({ 
-        name: "📅 Joined BOOM", 
-        value: date, 
-        inline: true 
-      });
-    }
-    
-    if (userData.recruitedBy) {
-      embed.fields.push({ 
-        name: "👤 Recruited By", 
-        value: `<@${userData.recruitedBy}>`, 
-        inline: true 
-      });
-    }
-    
     return await renderPlayerStats(mainAccount.playerTag, userData, isSelf, targetUserId);
   },
 
@@ -433,7 +407,7 @@ export default {
           return;
         }
 
-        const playerData = await response.json();
+        const playerData = (await response.json()) as ExternalPlayerData;
 
         const embed = {
           title: `👤 ${playerData.name} (#${selectedTag})`,
@@ -569,14 +543,7 @@ export default {
         if (mainAccount && guildId) {
           try {
             const nickname = `${mainAccount.playerName} | TH${mainAccount.townHallLevel}`;
-            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-              method: 'PATCH',
-              headers: {
-                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ nick: nickname }),
-            });
+            await setMemberNickname(guildId, userId, nickname);
             userData.nickname = nickname;
           } catch (nicknameError) {
             console.warn('Failed to update nickname:', nicknameError);

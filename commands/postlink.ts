@@ -9,9 +9,7 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-
-const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
-const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
+import { MAIN_SERVER_ID } from "../utils/config";
 
 export default {
   data: {

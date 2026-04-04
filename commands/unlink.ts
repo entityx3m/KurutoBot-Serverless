@@ -13,9 +13,22 @@ import type {
   ComponentHandler,
 } from "../utils/types";
 import { getUserData, setUserData } from "../utils/dbHelper";
+import { MAIN_SERVER_ID, ROLE_IDS } from "../utils/config";
+import { removeMemberRole, setMemberNickname } from "../utils/discordApi";
 
-const MAIN_SERVER_ID = process.env.GUILD_ID || "REDACTED_WM_ID";
-const VERIFIED_ROLE_ID = "REDACTED_VERIFIED_ID";
+type InteractionOption = { name: string; value: string };
+type ButtonComponent = {
+  type: 2;
+  style: number;
+  custom_id: string;
+  label: string;
+  emoji?: { name: string };
+};
+type ActionRow = { type: 1; components: ButtonComponent[] };
+
+function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
+  return options?.find((opt) => opt.name === name)?.value;
+}
 
 export default {
   data: {
@@ -47,9 +60,8 @@ export default {
       };
     }
 
-    const options = interaction.data.options || [];
-    const playerTagOption = options.find((opt: any) => opt.name === "player_tag");
-    const rawPlayerTag = playerTagOption?.value;
+    const options = interaction.data.options as InteractionOption[] | undefined;
+    const rawPlayerTag = getOptionValue(options, "player_tag");
 
     // Get user data
     const userData = await getUserData(userId);
@@ -65,11 +77,11 @@ export default {
       let accountList = "**📋 Your Linked Accounts:**\n\n";
       
       // Create buttons for each account
-      const components: any[] = [];
-      const actionRows: Array<{ type: number; components: any[] }> = [];
+      const components: ActionRow[] = [];
+      const actionRows: ActionRow[] = [];
       let currentRow = {
-        type: 1,
-        components: [] as any[]
+        type: 1 as const,
+        components: [] as ButtonComponent[]
       };
       
       userData.accounts.forEach((account, index) => {
@@ -147,14 +159,7 @@ export default {
       const guildId = interaction.guild_id!;
       try {
         const nickname = `${newMain.playerName} | TH${newMain.townHallLevel}`;
-        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ nick: nickname }),
-        });
+        await setMemberNickname(guildId, userId, nickname);
         userData.nickname = nickname;
       } catch (nicknameError) {
         console.warn('Failed to update nickname:', nicknameError);
@@ -167,27 +172,14 @@ export default {
       // Remove nickname
       const guildId = interaction.guild_id!;
       try {
-        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ nick: null }), // Remove nickname
-        });
+        await setMemberNickname(guildId, userId, null);
       } catch (nicknameError) {
         console.warn('Failed to remove nickname:', nicknameError);
       }
       
       // Remove Verified role
       try {
-        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        await removeMemberRole(guildId, userId, ROLE_IDS.VERIFIED);
       } catch (roleError) {
         console.warn('Failed to remove Verified role:', roleError);
       }
@@ -291,14 +283,7 @@ export default {
           const newMain = userData.accounts[0];
           try {
             const nickname = `${newMain.playerName} | TH${newMain.townHallLevel}`;
-            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-              method: 'PATCH',
-              headers: {
-                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ nick: nickname }),
-            });
+            await setMemberNickname(guildId, userId, nickname);
             userData.nickname = nickname;
           } catch (nicknameError) {
             console.warn('Failed to update nickname:', nicknameError);
@@ -309,27 +294,14 @@ export default {
           
           // Remove nickname
           try {
-            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-              method: 'PATCH',
-              headers: {
-                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ nick: null }),
-            });
+            await setMemberNickname(guildId, userId, null);
           } catch (nicknameError) {
             console.warn('Failed to remove nickname:', nicknameError);
           }
           
           // Remove Verified role
           try {
-            await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}/roles/${VERIFIED_ROLE_ID}`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bot ${process.env.DISCORD_TOKEN}`,
-                'Content-Type': 'application/json',
-              },
-            });
+            await removeMemberRole(guildId, userId, ROLE_IDS.VERIFIED);
           } catch (roleError) {
             console.warn('Failed to remove Verified role:', roleError);
           }
