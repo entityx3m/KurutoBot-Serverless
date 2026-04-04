@@ -9,7 +9,7 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-import { MAIN_SERVER_ID } from "../utils/config";
+import { EXTERNAL_LINKS, MAIN_SERVER_ID } from "../utils/config";
 
 export default {
   data: {
@@ -39,7 +39,7 @@ export default {
         fields: [
           {
             name: "<a:rg_blink:1456183866510282762> Quick Navigation",
-            value: "Verified? [**Click here to Create a Ticket**](https://discord.com/channels/REDACTED_GUILD_ID/REDACTED_CHANNEL_VERIFICATION_ID/REDACTED_MSG_ID)",
+            value: `Verified? [**Click here to Create a Ticket**](${EXTERNAL_LINKS.TICKET_CREATION_URL})`,
             inline: false
           }
         ],

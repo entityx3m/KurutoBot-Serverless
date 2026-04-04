@@ -98,10 +98,18 @@ The application now uses fail-fast config for critical values. Missing required 
 | DISCORD_APP_ID | Discord application ID |
 | DISCORD_TOKEN | Bot token for Discord REST operations |
 | GUILD_ID | Main BOOM House guild ID |
+| BOT_OWNER_ID | Discord user ID allowed to run owner-only commands |
 | COC_API_KEY | Clash of Clans API token |
 | GOOGLE_AI_API_KEY | Gemini API key for /chat |
+| TICKET_CREATION_URL | Full URL used in verification quick-navigation embeds |
 | SUPABASE_URL | Supabase project URL |
 | SUPABASE_ANON_KEY | Supabase key used by app reads/writes |
+| CLAN_TAG_WM | Clan tag for War Master |
+| CLAN_TAG_LE | Clan tag for LEGENDS |
+| CLAN_TAG_ZP | Clan tag for ZwartePiet |
+| CLAN_TAG_CH | Clan tag for Clash Heros |
+| CLAN_TAG_SP | Clan tag for SP.OPS.DIVISION |
+| CLAN_TAG_WA | Clan tag for War Addiction |
 | ROLE_BOOM_MEMBER_ID | BOOM member role ID |
 | ROLE_WM_ID | War Master role ID |
 | ROLE_LE_ID | Legends role ID |

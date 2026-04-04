@@ -8,14 +8,13 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
+import { BOT_OWNER_ID } from "../utils/config";
 
 type InteractionOption = { name: string; value: string };
 
 function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
   return options?.find((opt) => opt.name === name)?.value;
 }
-
-const OWNER_ID = "REDACTED_OWNER_ID"; // Same ID as above!
 
 export default {
   data: {
@@ -34,7 +33,7 @@ export default {
   async execute(data: { interaction: SimplifiedInteraction }): Promise<CommandExecuteResult> {
     const interaction = data.interaction;
 
-    if (interaction.member?.user?.id !== OWNER_ID) {
+    if (interaction.member?.user?.id !== BOT_OWNER_ID) {
       return {
         content: "Kuruto only 💀",
         flags: MessageFlags.Ephemeral,

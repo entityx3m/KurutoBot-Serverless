@@ -1,5 +1,4 @@
 import { CLANS, CHANNEL_IDS, ROLE_IDS } from "./config";
-import type { ClanInfo } from "./config";
 
 // Re-export for backward compatibility
 export const IDS = {

@@ -14,6 +14,12 @@ export const API_URLS = {
   DISCORD_API: "https://discord.com/api/v10"
 };
 
+export const BOT_OWNER_ID = requireEnv("BOT_OWNER_ID");
+
+export const EXTERNAL_LINKS = {
+  TICKET_CREATION_URL: requireEnv("TICKET_CREATION_URL")
+};
+
 export const ROLE_IDS = {
   BOOM_MEMBER: requireEnv("ROLE_BOOM_MEMBER_ID"),
   WM: requireEnv("ROLE_WM_ID"),
@@ -59,42 +65,42 @@ export const CLANS: Record<string, ClanInfo> = {
     name: "WAR MASTER",
     roleId: ROLE_IDS.WM,
     channelId: CHANNEL_IDS.WM,
-    tag: "REDACTED_WM_CLAN_TAG"
+    tag: requireEnv("CLAN_TAG_WM")
   },
   LE: {
     abbr: "LE",
     name: "LEGENDS",
     roleId: ROLE_IDS.LE,
     channelId: CHANNEL_IDS.LE,
-    tag: "REDACTED_LE_CLAN_TAG"
+    tag: requireEnv("CLAN_TAG_LE")
   },
   ZP: {
     abbr: "ZP",
     name: "ZwartePiet",
     roleId: ROLE_IDS.ZP,
     channelId: CHANNEL_IDS.ZP,
-    tag: "REDACTED_ZP_CLAN_TAG"
+    tag: requireEnv("CLAN_TAG_ZP")
   },
   CH: {
     abbr: "CH",
     name: "Clash Heros",
     roleId: ROLE_IDS.CH,
     channelId: CHANNEL_IDS.CH,
-    tag: "REDACTED_CH_CLAN_TAG"
+    tag: requireEnv("CLAN_TAG_CH")
   },
   SP: {
     abbr: "SP",
     name: "SP.OPS.DIVISION",
     roleId: ROLE_IDS.SP,
     channelId: CHANNEL_IDS.SP,
-    tag: "REDACTED_SP_CLAN_TAG"
+    tag: requireEnv("CLAN_TAG_SP")
   },
   WA: {                                           // New clan
     abbr: "WA",
     name: "War Addiction",
     roleId: ROLE_IDS.WA,
     channelId: CHANNEL_IDS.WA,
-    tag: "REDACTED_WA_CLAN_TAG"
+    tag: requireEnv("CLAN_TAG_WA")
   }
 };
 

@@ -8,9 +8,7 @@ import type {
   CommandExecuteResult,
   SimplifiedInteraction,
 } from "../utils/types";
-
-// YOUR DISCORD USER ID - REPLACE THIS!
-const OWNER_ID = "REDACTED_OWNER_ID"; // Your ID from logs
+import { BOT_OWNER_ID } from "../utils/config";
 
 export default {
   data: {
@@ -22,7 +20,7 @@ export default {
     const interaction = data.interaction;
 
     // Owner check
-    if (interaction.member?.user?.id !== OWNER_ID) {
+    if (interaction.member?.user?.id !== BOT_OWNER_ID) {
       return {
         content: "<a:redcross:1439044567415521443> Owner only command 💀",
         flags: MessageFlags.Ephemeral,

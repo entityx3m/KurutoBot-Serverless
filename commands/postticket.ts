@@ -55,7 +55,7 @@ export default {
       description: `We're a competitive network of 4 active clans led by **War Master** — our elite war clan with *an undefeated war streak*. 💪  
 Each clan follows the same standards of strategy, discipline, and teamwork — building a united alliance for serious and growth-driven players.
 
-📍 You can view all our clans here: <#REDACTED_CHANNEL_CLANS_LIST_ID>  
+📍 You can view all our clans here: <#${CHANNEL_IDS.CLANS_LIST}>  
 
 Please choose an option below to get started:
 
