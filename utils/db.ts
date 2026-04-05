@@ -12,6 +12,6 @@ function requireEnv(name: string): string {
 }
 
 const supabaseUrl = requireEnv('SUPABASE_URL');
-const supabaseKey = requireEnv('SUPABASE_ANON_KEY');
+const supabaseKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

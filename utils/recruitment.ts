@@ -248,7 +248,7 @@ export class RecruitmentTracker {
   }
 }
 
-// Initialize eagerly only when Supabase env is available at import time.
-if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+// Initialize eagerly only when the service role env is available at import time.
+if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   RecruitmentTracker.initialize().catch(console.error);
 }

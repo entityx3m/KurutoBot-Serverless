@@ -15,6 +15,8 @@ CREATE TABLE users (
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+  ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
 -- Create the Accounts table
 CREATE TABLE accounts (
     player_tag TEXT PRIMARY KEY,
@@ -31,6 +33,8 @@ CREATE TABLE accounts (
     linked_by TEXT
 );
 
+  ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+
 -- Create an index so searching by CoC Name is lightning fast
 CREATE INDEX idx_accounts_player_name ON accounts(player_name);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_one_main_per_user
@@ -45,6 +49,8 @@ CREATE TABLE IF NOT EXISTS clan_recruitment (
   last_updated TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   clan_tag TEXT
 );
+
+ALTER TABLE clan_recruitment ENABLE ROW LEVEL SECURITY;
 
 -- Helpful read ordering index for summaries.
 CREATE INDEX IF NOT EXISTS idx_clan_recruitment_clan

@@ -134,14 +134,10 @@ async function main() {
 
   const kvPrefix = process.env.MIGRATION_KV_PREFIX || process.env.GUILD_ID || "BOOM_HOUSE";
   const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY).");
-  }
-
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn("Using SUPABASE_ANON_KEY for migration. If RLS is enabled, use SUPABASE_SERVICE_ROLE_KEY instead.");
+    throw new Error("Missing SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY.");
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);

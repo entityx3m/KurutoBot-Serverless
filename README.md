@@ -103,7 +103,7 @@ The application now uses fail-fast config for critical values. Missing required 
 | GOOGLE_AI_API_KEY | Gemini API key for /chat |
 | TICKET_CREATION_URL | Full URL used in verification quick-navigation embeds |
 | SUPABASE_URL | Supabase project URL |
-| SUPABASE_ANON_KEY | Supabase key used by app reads/writes |
+| SUPABASE_SERVICE_ROLE_KEY | Supabase key used by app reads/writes |
 | CLAN_TAG_WM | Clan tag for War Master |
 | CLAN_TAG_LE | Clan tag for LEGENDS |
 | CLAN_TAG_ZP | Clan tag for ZwartePiet |
@@ -141,7 +141,6 @@ The application now uses fail-fast config for critical values. Missing required 
 | Variable | Purpose |
 | --- | --- |
 | FLASK_API_URL | Optional endpoint used by /ping |
-| SUPABASE_SERVICE_ROLE_KEY | Needed for migration/admin scripts |
 | MIGRATION_KV_PREFIX | Optional key prefix override for KV migration |
 
 ## Data Model (High Level)
@@ -163,6 +162,7 @@ npm run migrate:kv-to-supabase:apply
 - Rotate credentials immediately if exposed
 - Use Vercel project environment variables for production
 - Keep bot token, CoC API key, and Supabase service key private
+- The bot runtime should use SUPABASE_SERVICE_ROLE_KEY exclusively
 
 ## Scripts
 
