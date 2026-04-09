@@ -1,0 +1,91 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior in the BOOM House bot
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the BOOM House bot! Please fill out the form below with as much detail as possible.
+
+  - type: input
+    id: discord_server_id
+    attributes:
+      label: Discord Server ID
+      description: The ID of the Discord server where the issue occurred (if applicable)
+      placeholder: "e.g., 123456789012345678"
+    validations:
+      required: false
+
+  - type: input
+    id: command_or_feature
+    attributes:
+      label: Command / Feature
+      description: Which command or feature is affected? (e.g., /add, ticket system, linking)
+      placeholder: "/add, /player, ticket panel, etc."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: "e.g., The bot should assign the clan role and send a welcome DM."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include any error messages or unexpected outcomes.
+      placeholder: "e.g., Bot responded with 'Internal Server Error' or did nothing."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Provide a step-by-step description of how to trigger the bug.
+      placeholder: |
+        1. Run command '/add @user WM'
+        2. Provide player tag '#ABC123'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: |
+        Please provide relevant environment info. If you're a user, just tell us which Discord client you're using.
+        If you're a developer, include details about your local setup or deployment.
+      placeholder: |
+        - Bot version / commit hash: 
+        - Discord client: Desktop / Mobile / Web
+        - Deployment: Vercel / Local
+        - Node.js version (if applicable):
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs / Screenshots
+      description: |
+        If available, paste any error logs from Vercel or the bot console, or attach screenshots.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues and confirmed this bug has not been reported.
+          required: true
+        - label: I have checked that all required environment variables are set correctly (if applicable).
+          required: false

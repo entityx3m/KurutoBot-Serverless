@@ -1,0 +1,80 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for the BOOM House bot
+title: "[Feature]: "
+labels: ["enhancement"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion! Please describe the feature you'd like to see, and why it would benefit the BOOM House community.
+
+  - type: input
+    id: feature_summary
+    attributes:
+      label: Feature Summary
+      description: A short, clear description of the feature.
+      placeholder: "e.g., Add automatic role sync based on in-game clan membership"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_solved
+    attributes:
+      label: Problem / Motivation
+      description: What problem does this feature solve? Why is it needed?
+      placeholder: "Currently staff have to manually verify if a member is still in the clan. This would automate that process."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe how you envision the feature working. Include any command syntax, UI changes, or workflow modifications.
+      placeholder: |
+        - New slash command: `/sync-clan-role`
+        - Bot periodically checks each member's in-game clan via CoC API and updates Discord roles accordingly.
+        - Configurable via environment variables.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you thought of any alternative solutions or workarounds?
+      placeholder: "We could also have a manual command for staff to trigger the sync."
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Affected Area
+      description: Which part of the bot does this feature primarily impact?
+      multiple: true
+      options:
+        - Account Linking (/link, /unlink, /player)
+        - Recruitment (/add, /postrecruit)
+        - Ticket System (/postticket, /closeticket, /include)
+        - AI / Chat (/chat)
+        - Owner Commands (/servers, /leave)
+        - Configuration / Environment
+        - Database / Storage
+        - Documentation
+        - Other
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or references that might be helpful.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues and confirmed this feature has not already been requested.
+          required: true
+        - label: This feature aligns with the bot's purpose (BOOM House Clash of Clans alliance management).
+          required: true

@@ -1,0 +1,56 @@
+name: ❓ Question / General Inquiry
+description: Ask a question about the bot, its usage, or the codebase
+title: "[Question]: "
+labels: ["question"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question? We're happy to help! Please check the [README](https://github.com/entityx3m/KurutoBot-Serverless/blob/main/README.md) and existing issues first.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know? Be as specific as possible.
+      placeholder: "e.g., How do I set up the recruitment tracker for a new clan?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Provide any relevant context, such as what you've tried or links to documentation you've read.
+      placeholder: "I followed the setup guide and added the clan to .env, but the command doesn't show it."
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic Area
+      description: Which part of the bot does your question relate to?
+      options:
+        - Setup / Installation
+        - Configuration (.env)
+        - Commands Usage
+        - Account Linking
+        - Recruitment / /add
+        - Ticket System
+        - Database / Supabase
+        - Hosting / Vercel
+        - API Integration (CoC, Discord)
+        - Contribution / Development
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have read the [README](https://github.com/entityx3m/KurutoBot-Serverless/blob/main/README.md).
+          required: true
+        - label: I have searched existing issues (open and closed) for similar questions.
+          required: true
