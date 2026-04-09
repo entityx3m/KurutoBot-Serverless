@@ -11,7 +11,22 @@ function requireEnv(name: string): string {
 	return value;
 }
 
-const supabaseUrl = requireEnv('SUPABASE_URL');
-const supabaseKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+let supabaseClient: ReturnType<typeof createClient> | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabaseClient(): ReturnType<typeof createClient> {
+	if (!supabaseClient) {
+		const supabaseUrl = requireEnv('SUPABASE_URL');
+		const supabaseKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+		supabaseClient = createClient(supabaseUrl, supabaseKey);
+	}
+
+	return supabaseClient;
+}
+
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+	get(_target, property) {
+		const client = getSupabaseClient();
+		const value = Reflect.get(client, property, client);
+		return typeof value === 'function' ? value.bind(client) : value;
+	},
+}) as ReturnType<typeof createClient>;
