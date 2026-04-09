@@ -133,7 +133,7 @@ export default {
     } catch (error: unknown) {
       console.error('Error in link command:', error);
       return {
-        content: `<a:redcross:1439044567415521443> **Linking Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: "<a:redcross:1439044567415521443> **Linking Failed**\nAn internal error occurred while processing this request.",
         flags: MessageFlags.Ephemeral,
       };
     }

@@ -51,6 +51,7 @@ export type CocApiResponse<T> = CocApiSuccess<T> | CocApiError;
 class CocApi {
   private baseUrl = API_URLS.COC_API_BASE;
   private apiKey = process.env.COC_API_KEY;
+  private readonly requestTimeoutMs = 7000;
 
   /**
    * Get player data from Clash of Clans API
@@ -62,7 +63,7 @@ class CocApi {
           success: false,
           status: 500,
           statusText: "Internal Server Error",
-          message: "Missing required environment variable: COC_API_KEY"
+          message: "CoC service is currently unavailable"
         };
       }
 
@@ -81,7 +82,8 @@ class CocApi {
         headers: {
           "Authorization": `Bearer ${this.apiKey}`,
           "Accept": "application/json"
-        }
+        },
+        signal: AbortSignal.timeout(this.requestTimeoutMs)
       });
 
       if (!response.ok) {
@@ -96,8 +98,8 @@ class CocApi {
         return {
           success: false,
           status: response.status,
-          statusText: response.statusText,
-          message: `CoC API error: ${response.status} ${response.statusText}`
+          statusText: "Upstream Error",
+          message: "Failed to fetch player data from CoC service"
         };
       }
 
@@ -107,6 +109,14 @@ class CocApi {
         data
       };
     } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError") {
+        return {
+          success: false,
+          status: 504,
+          statusText: "Gateway Timeout",
+          message: "CoC service timed out"
+        };
+      }
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       return {
         success: false,
@@ -127,7 +137,7 @@ class CocApi {
           success: false,
           status: 500,
           statusText: "Internal Server Error",
-          message: "Missing required environment variable: COC_API_KEY"
+          message: "CoC service is currently unavailable"
         };
       }
 
@@ -137,7 +147,8 @@ class CocApi {
         headers: {
           "Authorization": `Bearer ${this.apiKey}`,
           "Accept": "application/json"
-        }
+        },
+        signal: AbortSignal.timeout(this.requestTimeoutMs)
       });
 
       if (!response.ok) {
@@ -152,8 +163,8 @@ class CocApi {
         return {
           success: false,
           status: response.status,
-          statusText: response.statusText,
-          message: `CoC API error: ${response.status} ${response.statusText}`
+          statusText: "Upstream Error",
+          message: "Failed to fetch clan data from CoC service"
         };
       }
 
@@ -163,6 +174,14 @@ class CocApi {
         data
       };
     } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError") {
+        return {
+          success: false,
+          status: 504,
+          statusText: "Gateway Timeout",
+          message: "CoC service timed out"
+        };
+      }
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       return {
         success: false,

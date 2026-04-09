@@ -546,7 +546,7 @@ Thank you for your interest in joining the **Boom House Alliance Staff Team!** ð
     await axios.patch(
       `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
       {
-        content: `<a:redcross:1439044567415521443> Failed to create ticket: ${error instanceof Error ? error.message : "Unknown error"}`,
+        content: "<a:redcross:1439044567415521443> Failed to create ticket due to an internal error.",
       }
     );
   }

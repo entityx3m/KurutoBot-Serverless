@@ -5,6 +5,7 @@ import { InteractionResponseType, MessageFlags } from "discord-api-types/v10";
 import { InteractionType, verifyKey } from "discord-interactions";
 import getRawBody from "raw-body";
 import commands from "./.discraft/commands/index";
+import { MAIN_SERVER_ID } from "./utils/config";
 import { logger } from "./utils/logger";
 import {
   type Command,
@@ -28,6 +29,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).send({ error: "Invalid request headers" });
     }
 
+    const parsedTimestamp = Number.parseInt(timestamp, 10);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const maxSkewSeconds = 300;
+    if (Number.isNaN(parsedTimestamp) || Math.abs(currentTimestamp - parsedTimestamp) > maxSkewSeconds) {
+      return res.status(401).send({ error: "Request timestamp outside acceptable window" });
+    }
+
     if (!process.env.DISCORD_PUBLIC_KEY) {
       return res.status(500).send({ error: "Internal server configuration error" });
     }
@@ -49,6 +57,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 2. HANDLE PING
     if (message.type === InteractionType.PING) {
       return res.status(200).json({ type: InteractionResponseType.Pong });
+    }
+
+    if (message.guild_id !== MAIN_SERVER_ID) {
+      return res.status(200).json({
+        type: InteractionResponseType.ChannelMessageWithSource,
+        data: {
+          content: "<a:redcross:1439044567415521443> This interaction is only available in the BOOM House server.",
+          flags: MessageFlags.Ephemeral,
+        },
+      });
     }
 
     // 3. ROUTER: HANDLE BUTTONS & MODALS

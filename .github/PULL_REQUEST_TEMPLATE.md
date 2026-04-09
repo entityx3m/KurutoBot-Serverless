@@ -32,3 +32,7 @@
 - [ ] My changes do not introduce new warnings or errors.
 - [ ] I have checked for any breaking changes and documented them.
 - [ ] I have tested that environment variable changes are reflected in `.env.example`.
+- [ ] No hardcoded secrets/tokens/keys were introduced.
+- [ ] User-facing errors are sanitized and do not expose internal details.
+- [ ] New interaction handlers enforce server/permission boundaries.
+- [ ] Network calls added in this PR include timeout handling.

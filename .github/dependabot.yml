@@ -4,8 +4,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
       time: "09:00"
       timezone: "UTC"
     open-pull-requests-limit: 10
@@ -19,6 +18,10 @@ updates:
       - "Kuruto" # Replace with your GitHub username
     versioning-strategy: "auto"
     groups:
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
       discord:
         patterns:
           - "discord.js"

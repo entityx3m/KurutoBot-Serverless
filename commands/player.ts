@@ -81,6 +81,7 @@ async function renderPlayerStats(
         'Authorization': `Bearer ${process.env.COC_API_KEY}`,
         'Accept': 'application/json'
       },
+      signal: AbortSignal.timeout(7000),
     });
     if (response.ok) {
       playerData = await response.json();
@@ -270,6 +271,7 @@ export default {
             'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
             'Accept': 'application/json' 
           },
+          signal: AbortSignal.timeout(7000),
         });
 
         if (!response.ok) {
@@ -327,7 +329,7 @@ export default {
         };
       } catch (error) {
         return {
-          content: `<a:redcross:1439044567415521443> **Lookup Failed**\n${error instanceof Error ? error.message : "Unknown error"}`,
+          content: "<a:redcross:1439044567415521443> **Lookup Failed**\nAn internal error occurred while processing this request.",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -393,6 +395,7 @@ export default {
             'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
             'Accept': 'application/json' 
           },
+          signal: AbortSignal.timeout(7000),
         });
 
         if (!response.ok) {

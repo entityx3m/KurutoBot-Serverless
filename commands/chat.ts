@@ -156,7 +156,7 @@ export default {
       const googleAiApiKey = process.env.GOOGLE_AI_API_KEY;
       if (!googleAiApiKey) {
         return {
-          content: "Missing required environment variable: GOOGLE_AI_API_KEY",
+          content: "Chat service is temporarily unavailable. Please try again later.",
           flags: MessageFlags.Ephemeral,
         };
       }

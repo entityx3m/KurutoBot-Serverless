@@ -191,6 +191,7 @@ export default {
           'Authorization': `Bearer ${process.env.COC_API_KEY}`, 
           'Accept': 'application/json' 
         },
+        signal: AbortSignal.timeout(7000),
       });
       
       if (!response.ok) {
@@ -317,7 +318,7 @@ export default {
       console.error('Error in add command:', error);
       
       return {
-        content: `<a:redcross:1439044567415521443> **Recruitment Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: "<a:redcross:1439044567415521443> **Recruitment Failed**\nAn internal error occurred while processing this request.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -459,7 +460,7 @@ export default {
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           { 
-            content: `<a:redcross:1439044567415521443> **Force Add Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
+            content: "<a:redcross:1439044567415521443> **Force Add Failed**\nAn internal error occurred while processing this request.",
             components: [] 
           }
         );
