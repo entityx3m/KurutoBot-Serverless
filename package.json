@@ -23,7 +23,7 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.100.1",
     "@vercel/node": "^5.7.2",
-    "axios": "^1.12.2",
+    "axios": "^1.15.0",
     "consola": "^3.4.2",
     "discord-api-types": "^0.38.29",
     "discord-interactions": "^4.4.0",
