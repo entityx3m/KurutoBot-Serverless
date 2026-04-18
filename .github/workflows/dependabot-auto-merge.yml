@@ -14,10 +14,24 @@ permissions:
 
 jobs:
   auto-merge:
-    if: github.actor == 'dependabot[bot]' && !github.event.pull_request.draft
+    if: >
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      !github.event.pull_request.head.repo.fork &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/') &&
+      !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Auto-approve Dependabot PR
+        if: >
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
         uses: actions/github-script@v7
         with:
           script: |
@@ -29,6 +43,10 @@ jobs:
             })
 
       - name: Enable auto-merge
+        # Auto-merge only queues and will merge after repository-required checks pass.
+        if: >
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
         uses: actions/github-script@v7
         with:
           script: |
