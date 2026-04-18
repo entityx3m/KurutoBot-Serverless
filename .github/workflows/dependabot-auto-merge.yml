@@ -52,18 +52,22 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
-            await github.graphql(
-              `mutation EnableAutoMerge($pullRequestId: ID!) {
-                enablePullRequestAutoMerge(input: {
-                  pullRequestId: $pullRequestId,
-                  mergeMethod: SQUASH
-                }) {
-                  pullRequest {
-                    number
+            try {
+              await github.graphql(
+                `mutation EnableAutoMerge($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: $pullRequestId,
+                    mergeMethod: SQUASH
+                  }) {
+                    pullRequest {
+                      number
+                    }
                   }
+                }`,
+                {
+                  pullRequestId: context.payload.pull_request.node_id
                 }
-              }`,
-              {
-                pullRequestId: context.payload.pull_request.node_id
-              }
-            )
+              )
+            } catch (error) {
+              core.setFailed(`Failed to enable auto-merge for #${context.payload.pull_request.number}: ${error.message}`)
+            }
