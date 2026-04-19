@@ -94,7 +94,7 @@ export class RecruitmentTracker {
           const category = configuredClan.category;
           const clanChannelId = configuredClan.clanChannelId;
           const clanRoleId = configuredClan.clanRoleId;
-          const isMainClan = category === "main";
+          const isMainClan = category === "main_clan";
 
           if (!category || (isMainClan && (!clanChannelId || !clanRoleId))) {
             console.warn(
