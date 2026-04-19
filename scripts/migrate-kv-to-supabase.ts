@@ -200,6 +200,45 @@ function buildClanSetupSeedRowsFromEnv(): ClanSetupSeedRow[] {
   return rows;
 }
 
+function buildLegacyClanLookup(seedRows: ClanSetupSeedRow[]): Map<string, string> {
+  const lookup = new Map<string, string>();
+  for (const row of seedRows) {
+    const normalizedTag = normalizeTag(row.clan_tag);
+    if (!normalizedTag) continue;
+
+    lookup.set(normalizedTag, normalizedTag);
+    lookup.set(row.abbreviation.trim().toUpperCase(), normalizedTag);
+    lookup.set(row.clan_name.trim().toUpperCase(), normalizedTag);
+  }
+
+  return lookup;
+}
+
+function normalizeLegacyClanValue(
+  value: string | undefined,
+  lookup: Map<string, string>
+): string | null {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  const normalizedTag = normalizeTag(raw);
+  if (raw.startsWith("#") && normalizedTag) {
+    return normalizedTag;
+  }
+
+  const normalizedRaw = raw.toUpperCase();
+  const mapped = lookup.get(normalizedRaw) || (normalizedTag ? lookup.get(normalizedTag) : undefined);
+  if (mapped) {
+    return mapped;
+  }
+
+  if (normalizedTag.length >= 5) {
+    return normalizedTag;
+  }
+
+  return normalizedRaw;
+}
+
 async function scanUserKeys(prefix: string): Promise<string[]> {
   const match = `${prefix}:user:*`;
   const keys = new Set<string>();
@@ -252,6 +291,9 @@ async function main() {
 
   console.log(`Starting KV -> Supabase migration (${dryRun ? "DRY RUN" : "APPLY"})`);
   console.log(`KV prefix: ${kvPrefix}`);
+
+  const clanSeedRows = buildClanSetupSeedRowsFromEnv();
+  const legacyClanLookup = buildLegacyClanLookup(clanSeedRows);
 
   const keys = await scanUserKeys(kvPrefix);
   console.log(`Discovered ${keys.length} legacy user keys`);
@@ -350,7 +392,7 @@ async function main() {
       recruited_at: rawUser.recruitedAt || null,
       recruited_by: rawUser.recruitedBy || null,
       recruiter_name: rawUser.recruiterName || null,
-      clan: rawUser.clan || null,
+      clan: normalizeLegacyClanValue(rawUser.clan, legacyClanLookup),
       nickname: rawUser.nickname || null,
       last_updated: toIsoOrNow(rawUser.lastUpdated),
     });
@@ -364,7 +406,6 @@ async function main() {
   console.log(`- accounts skipped (invalid): ${accountsSkippedInvalid}`);
   console.log(`- accounts skipped (cross-user conflict): ${accountsSkippedConflict}`);
 
-  const clanSeedRows = buildClanSetupSeedRowsFromEnv();
   console.log(`- clan rows prepared from env: ${clanSeedRows.length}`);
 
   if (dryRun) {
