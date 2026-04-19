@@ -226,13 +226,20 @@ export class RecruitmentTracker {
     }
   }
 
+  private static normalizeClanLookupTag(clan: string): string {
+    return clan.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  }
+
   static async getClan(clan: string): Promise<ClanRecruitment | null> {
     try {
-      const normalized = clan.trim().toUpperCase();
+      const normalizedAbbreviation = clan.trim().toUpperCase();
+      const normalizedClanTag = this.normalizeClanLookupTag(clan);
       const { data, error } = await (supabase as any)
         .from(this.TABLE)
         .select("*")
-        .or(`clan_tag.eq.${normalized},abbreviation.eq.${normalized}`)
+        .or(
+          `clan_tag.eq.${normalizedClanTag},abbreviation.eq.${normalizedAbbreviation}`
+        )
         .maybeSingle();
 
       if (error) {
