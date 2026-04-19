@@ -104,49 +104,84 @@ function chunk<T>(items: T[], size: number): T[][] {
   return output;
 }
 
+type ClanEnvDefinition = {
+  name: string;
+  abbreviation: string;
+  tag: string | undefined;
+  channelId: string | undefined;
+  roleId: string | undefined;
+};
+
+const CLAN_ENV_DEFINITIONS: ClanEnvDefinition[] = [
+  {
+    name: "WAR MASTER",
+    abbreviation: "WM",
+    tag: process.env.CLAN_TAG_WM,
+    channelId: process.env.CHANNEL_WM_ID,
+    roleId: process.env.ROLE_WM_ID,
+  },
+  {
+    name: "LEGENDS",
+    abbreviation: "LE",
+    tag: process.env.CLAN_TAG_LE,
+    channelId: process.env.CHANNEL_LE_ID,
+    roleId: process.env.ROLE_LE_ID,
+  },
+  {
+    name: "ZwartePiet",
+    abbreviation: "ZP",
+    tag: process.env.CLAN_TAG_ZP,
+    channelId: process.env.CHANNEL_ZP_ID,
+    roleId: process.env.ROLE_ZP_ID,
+  },
+  {
+    name: "Clash Heros",
+    abbreviation: "CH",
+    tag: process.env.CLAN_TAG_CH,
+    channelId: process.env.CHANNEL_CH_ID,
+    roleId: process.env.ROLE_CH_ID,
+  },
+  {
+    name: "War Addiction",
+    abbreviation: "WA",
+    tag: process.env.CLAN_TAG_WA,
+    channelId: process.env.CHANNEL_WA_ID,
+    roleId: process.env.ROLE_WA_ID,
+  },
+];
+
+function buildLegacyClanTagLookup(): Record<string, string> {
+  const lookup: Record<string, string> = {};
+
+  for (const clan of CLAN_ENV_DEFINITIONS) {
+    const normalizedTag = normalizeTag(clan.tag);
+    if (!normalizedTag) continue;
+    lookup[clan.abbreviation.toUpperCase()] = normalizedTag;
+  }
+
+  return lookup;
+}
+
+const LEGACY_CLAN_TAG_LOOKUP = buildLegacyClanTagLookup();
+
+function translateLegacyClanToTag(value: string | undefined): string | null {
+  if (!value) return null;
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return null;
+
+  const abbreviationMatch = LEGACY_CLAN_TAG_LOOKUP[trimmedValue.toUpperCase()];
+  if (abbreviationMatch) return abbreviationMatch;
+
+  return normalizeTag(trimmedValue);
+}
+
 function buildClanSetupSeedRowsFromEnv(): ClanSetupSeedRow[] {
   const nowIso = new Date().toISOString();
-  const candidates = [
-    {
-      name: "WAR MASTER",
-      abbreviation: "WM",
-      tag: process.env.CLAN_TAG_WM,
-      channelId: process.env.CHANNEL_WM_ID,
-      roleId: process.env.ROLE_WM_ID,
-    },
-    {
-      name: "LEGENDS",
-      abbreviation: "LE",
-      tag: process.env.CLAN_TAG_LE,
-      channelId: process.env.CHANNEL_LE_ID,
-      roleId: process.env.ROLE_LE_ID,
-    },
-    {
-      name: "ZwartePiet",
-      abbreviation: "ZP",
-      tag: process.env.CLAN_TAG_ZP,
-      channelId: process.env.CHANNEL_ZP_ID,
-      roleId: process.env.ROLE_ZP_ID,
-    },
-    {
-      name: "Clash Heros",
-      abbreviation: "CH",
-      tag: process.env.CLAN_TAG_CH,
-      channelId: process.env.CHANNEL_CH_ID,
-      roleId: process.env.ROLE_CH_ID,
-    },
-    {
-      name: "War Addiction",
-      abbreviation: "WA",
-      tag: process.env.CLAN_TAG_WA,
-      channelId: process.env.CHANNEL_WA_ID,
-      roleId: process.env.ROLE_WA_ID,
-    },
-  ];
-
   const rows: ClanSetupSeedRow[] = [];
-  for (const candidate of candidates) {
-    const normalizedTag = normalizeTag(candidate.tag);
+
+  for (const candidate of CLAN_ENV_DEFINITIONS) {
+    const normalizedTag = translateLegacyClanToTag(candidate.tag);
     if (!normalizedTag) continue;
 
     rows.push({
