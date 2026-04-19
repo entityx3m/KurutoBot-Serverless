@@ -124,11 +124,13 @@ export async function getClanByTag(clanTag: string): Promise<ClanSetup | null> {
 
 export async function getMainClanByTagOrName(query: string): Promise<ClanSetup | null> {
   const normalizedTag = normalizeClanTag(query);
+  const normalizedQuery = query.trim().toLowerCase();
   const mainClans = await getMainClans();
 
   return (
     mainClans.find((clan) => clan.clanTag === normalizedTag) ||
-    mainClans.find((clan) => clan.clanName.toLowerCase() === query.trim().toLowerCase()) ||
+    mainClans.find((clan) => clan.clanName.toLowerCase() === normalizedQuery) ||
+    mainClans.find((clan) => clan.abbreviation.toLowerCase() === normalizedQuery) ||
     null
   );
 }
