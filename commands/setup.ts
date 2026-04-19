@@ -133,6 +133,13 @@ export default {
       }
 
       const executorId = interaction.member?.user?.id;
+      if (!executorId) {
+        return {
+          content: "<a:redcross:1495393630112841839> Unable to determine which user opened the unlink menu.",
+          flags: MessageFlags.Ephemeral,
+        };
+      }
+
       const options = configuredClans.slice(0, 25).map((clan) => ({
         label: `[${clan.abbreviation}] ${clan.clanName}`.slice(0, 100),
         value: clan.clanTag,
