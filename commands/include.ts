@@ -46,7 +46,7 @@ export default {
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
         content:
-          "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+          "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -56,7 +56,7 @@ export default {
     const guildId = interaction.guild_id;
     if (!userId || !channelId || !guildId) {
       return {
-        content: "<a:redcross:1439044567415521443> Could not identify context.",
+        content: "<a:redcross:1495393630112841839> Could not identify context.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -65,7 +65,7 @@ export default {
     const targetUserId = getOptionValue(options, "user");
     if (!targetUserId) {
       return {
-        content: "<a:redcross:1439044567415521443> Please specify a user.",
+        content: "<a:redcross:1495393630112841839> Please specify a user.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -75,7 +75,7 @@ export default {
       if (!ticketContext) {
         return {
           content:
-            "<a:redcross:1439044567415521443> This command can only be used inside a ticket channel.",
+            "<a:redcross:1495393630112841839> This command can only be used inside a ticket channel.",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -85,7 +85,7 @@ export default {
       if (!hasPermission) {
         return {
           content:
-            "<a:redcross:1439044567415521443> You don't have permission to add users to this ticket.",
+            "<a:redcross:1495393630112841839> You don't have permission to add users to this ticket.",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -123,20 +123,20 @@ export default {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            content: `<a:AnimatedCheck:1427570005750448169> <@${targetUserId}> has been added to this ticket by <@${userId}>.`,
+            content: `<a:AnimatedCheck:1495392848072413275> <@${targetUserId}> has been added to this ticket by <@${userId}>.`,
           }),
         }
       );
 
       // Acknowledge the command
       return {
-        content: `<a:AnimatedCheck:1427570005750448169> Successfully added <@${targetUserId}> to the ticket.`,
+        content: `<a:AnimatedCheck:1495392848072413275> Successfully added <@${targetUserId}> to the ticket.`,
         flags: MessageFlags.Ephemeral,
       };
     } catch (error) {
       console.error("Error in include command:", error);
       return {
-        content: `<a:redcross:1439044567415521443> Failed to add user: ${
+        content: `<a:redcross:1495393630112841839> Failed to add user: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
         flags: MessageFlags.Ephemeral,

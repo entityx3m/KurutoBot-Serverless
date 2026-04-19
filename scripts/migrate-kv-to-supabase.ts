@@ -72,6 +72,18 @@ type AccountRow = {
   linked_by: string | null;
 };
 
+type ClanSetupSeedRow = {
+  clan_tag: string;
+  clan_name: string;
+  category: "main_clan" | "cwl_clan" | "alt_clan";
+  abbreviation: string;
+  clan_channel_id: string | null;
+  clan_role_id: string | null;
+  member_count: number;
+  last_updated: string;
+  updated_at: string;
+};
+
 function normalizeTag(tag: string | undefined): string {
   if (!tag) return "";
   return tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -90,6 +102,67 @@ function chunk<T>(items: T[], size: number): T[][] {
     output.push(items.slice(i, i + size));
   }
   return output;
+}
+
+function buildClanSetupSeedRowsFromEnv(): ClanSetupSeedRow[] {
+  const nowIso = new Date().toISOString();
+  const candidates = [
+    {
+      name: "WAR MASTER",
+      abbreviation: "WM",
+      tag: process.env.CLAN_TAG_WM,
+      channelId: process.env.CHANNEL_WM_ID,
+      roleId: process.env.ROLE_WM_ID,
+    },
+    {
+      name: "LEGENDS",
+      abbreviation: "LE",
+      tag: process.env.CLAN_TAG_LE,
+      channelId: process.env.CHANNEL_LE_ID,
+      roleId: process.env.ROLE_LE_ID,
+    },
+    {
+      name: "ZwartePiet",
+      abbreviation: "ZP",
+      tag: process.env.CLAN_TAG_ZP,
+      channelId: process.env.CHANNEL_ZP_ID,
+      roleId: process.env.ROLE_ZP_ID,
+    },
+    {
+      name: "Clash Heros",
+      abbreviation: "CH",
+      tag: process.env.CLAN_TAG_CH,
+      channelId: process.env.CHANNEL_CH_ID,
+      roleId: process.env.ROLE_CH_ID,
+    },
+    {
+      name: "War Addiction",
+      abbreviation: "WA",
+      tag: process.env.CLAN_TAG_WA,
+      channelId: process.env.CHANNEL_WA_ID,
+      roleId: process.env.ROLE_WA_ID,
+    },
+  ];
+
+  const rows: ClanSetupSeedRow[] = [];
+  for (const candidate of candidates) {
+    const normalizedTag = normalizeTag(candidate.tag);
+    if (!normalizedTag) continue;
+
+    rows.push({
+      clan_tag: normalizedTag,
+      clan_name: candidate.name,
+      category: "main_clan",
+      abbreviation: candidate.abbreviation,
+      clan_channel_id: candidate.channelId || null,
+      clan_role_id: candidate.roleId || null,
+      member_count: 0,
+      last_updated: nowIso,
+      updated_at: nowIso,
+    });
+  }
+
+  return rows;
 }
 
 async function scanUserKeys(prefix: string): Promise<string[]> {
@@ -256,6 +329,9 @@ async function main() {
   console.log(`- accounts skipped (invalid): ${accountsSkippedInvalid}`);
   console.log(`- accounts skipped (cross-user conflict): ${accountsSkippedConflict}`);
 
+  const clanSeedRows = buildClanSetupSeedRowsFromEnv();
+  console.log(`- clan rows prepared from env: ${clanSeedRows.length}`);
+
   if (dryRun) {
     console.log("Dry run complete. No changes were written to Supabase.");
     console.log("Run with --apply to write data.");
@@ -276,9 +352,19 @@ async function main() {
     }
   }
 
+  if (clanSeedRows.length > 0) {
+    for (const batch of chunk(clanSeedRows, 200)) {
+        const { error } = await supabase.from("clans").upsert(batch, { onConflict: "clan_tag" });
+      if (error) {
+          throw new Error(`Failed upserting clans batch: ${error.message}`);
+      }
+    }
+  }
+
   console.log("Migration applied successfully.");
   console.log(`- users upserted: ${userRows.length}`);
   console.log(`- accounts upserted: ${accountRows.length}`);
+  console.log(`- clan setup rows upserted: ${clanSeedRows.length}`);
 }
 
 main().catch((error) => {

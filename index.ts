@@ -13,6 +13,22 @@ import {
   type SimplifiedInteraction,
 } from "./utils/types";
 
+function getAxiosErrorDetails(error: unknown): { message: string; status?: number; responseData?: unknown } {
+  if (axios.isAxiosError(error)) {
+    return {
+      message: error.message,
+      status: error.response?.status,
+      responseData: error.response?.data,
+    };
+  }
+
+  if (error instanceof Error) {
+    return { message: error.message };
+  }
+
+  return { message: "Unknown error" };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     logger.debug("Request received", { method: req.method, url: req.url });
@@ -63,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         type: InteractionResponseType.ChannelMessageWithSource,
         data: {
-          content: "<a:redcross:1439044567415521443> This interaction is only available in the BOOM House server.",
+          content: "<a:redcross:1495393630112841839> This interaction is only available in the BOOM House server.",
           flags: MessageFlags.Ephemeral,
         },
       });
@@ -125,6 +141,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 4. HANDLE SLASH COMMANDS
+    else if (message.type === InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE) {
+      const commandName = message.data.name.toLowerCase();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const command: Command = (commands as any)[commandName];
+
+      if (!command?.autocomplete) {
+        return res.status(200).json({
+          type: InteractionResponseType.ApplicationCommandAutocompleteResult,
+          data: { choices: [] },
+        });
+      }
+
+      try {
+        const result = await command.autocomplete({ interaction: message });
+        return res.status(200).json({
+          type: InteractionResponseType.ApplicationCommandAutocompleteResult,
+          data: {
+            choices: result.choices.slice(0, 25),
+          },
+        });
+      } catch (error) {
+        logger.error("Error handling autocomplete", { commandName, error });
+        return res.status(200).json({
+          type: InteractionResponseType.ApplicationCommandAutocompleteResult,
+          data: { choices: [] },
+        });
+      }
+    }
+
+    // 5. HANDLE SLASH COMMANDS
     else if (message.type === InteractionType.APPLICATION_COMMAND) {
       const commandName = message.data.name.toLowerCase();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -154,18 +200,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Reply
         try {
+          const replyPayload = {
+            content: commandResult?.content ?? "",
+            embeds: commandResult?.embeds || [],
+            components: commandResult?.components || [],
+          };
+
           await axios.patch(
             `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
-            {
-              content: commandResult?.content ?? "",
-              embeds: commandResult?.embeds || [],
-              components: commandResult?.components || [],
-              flags: commandResult?.flags || 0,
-            },
+            replyPayload,
             { headers: { "Content-Type": "application/json" } },
           );
           return res.status(200).end();
-        } catch (e) { return res.status(500).json({ error: "Failed to reply" }); }
+        } catch (error) {
+          const errorDetails = getAxiosErrorDetails(error);
+          logger.error("Error replying to interaction", {
+            commandName,
+            interactionId: message.id,
+            applicationId: message.application_id,
+            status: errorDetails.status,
+            responseData: errorDetails.responseData,
+            error: errorDetails.message,
+          });
+
+          try {
+            await axios.patch(
+              `https://discord.com/api/v10/webhooks/${message.application_id}/${message.token}/messages/@original`,
+              {
+                content: "<a:redcross:1495393630112841839> Something went wrong while building this response. Please try again.",
+                embeds: [],
+                components: [],
+              },
+              { headers: { "Content-Type": "application/json" } },
+            );
+            return res.status(200).end();
+          } catch (fallbackError) {
+            const fallbackErrorDetails = getAxiosErrorDetails(fallbackError);
+            logger.error("Failed to send fallback interaction reply", {
+              commandName,
+              interactionId: message.id,
+              applicationId: message.application_id,
+              status: fallbackErrorDetails.status,
+              responseData: fallbackErrorDetails.responseData,
+              error: fallbackErrorDetails.message,
+            });
+            return res.status(500).json({ error: "Failed to reply" });
+          }
+        }
       }
     }
 
@@ -185,7 +266,7 @@ async function handleHandlerError(message: SimplifiedInteraction, error: any, re
       {
         type: InteractionResponseType.ChannelMessageWithSource,
         data: { 
-          content: "<a:redcross:1439044567415521443> Interaction failed due to an error.", 
+          content: "<a:redcross:1495393630112841839> Interaction failed due to an error.", 
           flags: MessageFlags.Ephemeral 
         }
       }

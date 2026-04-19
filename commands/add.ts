@@ -7,10 +7,11 @@ import {
   PermissionFlagsBits,
 } from "discord-api-types/v10";
 import type {
+  CommandAutocompleteResult,
   CommandData,
   CommandExecuteResult,
   SimplifiedInteraction,
-  ComponentHandler,
+  InteractionDataOption,
 } from "../utils/types";
 import { 
   getUserData, 
@@ -20,7 +21,6 @@ import {
 import { linkPlayerAccount } from "../utils/linkHelper";
 import {
   IDS,
-  CLAN_MAP,
   sendWelcomeDM,
   sendClanWelcome,
   processVisitorRole,
@@ -30,13 +30,13 @@ import {
 } from "../utils/addHelper";
 import { API_URLS, MAIN_SERVER_ID, ROLE_IDS } from "../utils/config";
 import { addMemberRole, setMemberNickname } from "../utils/discordApi";
+import { getMainClanAutocompleteChoices, getMainClanByTagOrName } from "../utils/clanSetup";
 
 const COC_API_BASE_URL = API_URLS.COC_API_BASE;
 
-type InteractionOption = { name: string; value: string };
-
-function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
-  return options?.find((opt) => opt.name === name)?.value;
+function getOptionValue(options: InteractionDataOption[] | undefined, name: string): string | undefined {
+  const option = options?.find((opt) => opt.name === name);
+  return typeof option?.value === "string" ? option.value : undefined;
 }
 
 export default {
@@ -54,17 +54,10 @@ export default {
       },
       {
         name: "clan",
-        description: "Clan abbreviation",
+        description: "Configured main clan",
         type: ApplicationCommandOptionType.String,
         required: true,
-        choices: [
-          { name: "WM (War Master)", value: "WM" },
-          { name: "LE (LEGENDS)", value: "LE" },
-          { name: "ZP (ZwartePiet)", value: "ZP" },
-          { name: "CH (Clash Heros)", value: "CH" },
-          { name: "SP (SP.OPS.DIVISION)", value: "SP" },
-          { name: "WA (War Addiction)", value: "WA" }
-        ]
+        autocomplete: true,
       },
       {
         name: "player_tag",
@@ -82,7 +75,7 @@ export default {
     // Check if command is being used in the correct server
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+        content: "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -97,17 +90,33 @@ export default {
 
     const chatInteraction = interaction;
 
-    const options = chatInteraction.data.options as InteractionOption[] | undefined;
+    const options = chatInteraction.data.options as InteractionDataOption[] | undefined;
     const memberId = getOptionValue(options, "member");
-    const clan = getOptionValue(options, "clan");
+    const clanInput = getOptionValue(options, "clan");
     const rawPlayerTag = getOptionValue(options, "player_tag");
 
-    if (!memberId || !clan) {
+    if (!memberId || !clanInput) {
       return {
-        content: "<a:redcross:1439044567415521443> Missing required command options.",
+        content: "<a:redcross:1495393630112841839> Missing required command options.",
         flags: MessageFlags.Ephemeral,
       };
     }
+
+    const clanConfig = await getMainClanByTagOrName(clanInput);
+    if (!clanConfig || !clanConfig.clanRoleId || !clanConfig.clanChannelId) {
+      return {
+        content: "<a:redcross:1495393630112841839> Invalid clan selection. Please configure the clan via `/setup clan` first.",
+        flags: MessageFlags.Ephemeral,
+      };
+    }
+
+    const clanInfo = {
+      role: clanConfig.clanRoleId,
+      channel: clanConfig.clanChannelId,
+      name: clanConfig.clanName,
+      abbr: clanConfig.abbreviation,
+      tag: clanConfig.clanTag,
+    };
 
     // Check for linked account if no player_tag provided
     let playerTag: string;
@@ -121,7 +130,7 @@ export default {
           const executorId = interaction.member?.user?.id;
 
           return {
-            content: `<a:red_warning:1463226880630198476> **No Linked Account Found**\n\n<@${memberId}> has not linked their Clash of Clans account.\n\n**If you proceed:**\n• Nickname will **NOT** be updated automatically.\n• "Verified" role will **NOT** be assigned.\n• You must handle these manually.\n\nDo you want to force add them anyway?`,
+            content: `<a:red_warning:1495394167877009549> **No Linked Account Found**\n\n<@${memberId}> has not linked their Clash of Clans account.\n\n**If you proceed:**\n• Nickname will **NOT** be updated automatically.\n• "Verified" role will **NOT** be assigned.\n• You must handle these manually.\n\nDo you want to force add them anyway?`,
             flags: MessageFlags.Ephemeral,
             components: [
               {
@@ -131,7 +140,7 @@ export default {
                     type: 2, 
                     style: 3, // SUCCESS (Green)
                     // SECURE: Add executorId to the custom_id
-                    custom_id: `add_force_confirm:${memberId}:${clan}:${executorId}`,
+                    custom_id: `add_force_confirm:${memberId}:${clanConfig.clanTag}:${executorId}`,
                     label: "Proceed Anyway",
                     emoji: { name: "✅" },
                   },
@@ -151,7 +160,7 @@ export default {
         playerTag = mainAccount.playerTag;
       } catch (error) {
         return {
-          content: "<a:redcross:1439044567415521443> Failed to check for linked account. Please provide player_tag manually.",
+          content: "<a:redcross:1495393630112841839> Failed to check for linked account. Please provide player_tag manually.",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -160,7 +169,7 @@ export default {
       playerTag = rawPlayerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (!playerTag || !/^[A-Z0-9]{3,15}$/.test(playerTag)) {
         return {
-          content: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+          content: "<a:redcross:1495393630112841839> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -172,14 +181,6 @@ export default {
     if (!memberUser) {
       return {
         content: "Could not find the specified member.",
-        flags: MessageFlags.Ephemeral,
-      };
-    }
-
-    const clanInfo = CLAN_MAP[clan as keyof typeof CLAN_MAP];
-    if (!clanInfo) {
-      return {
-        content: "Invalid clan provided.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -197,7 +198,7 @@ export default {
       if (!response.ok) {
         if (response.status === 404) {
           return {
-            content: `<a:redcross:1439044567415521443> **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
+            content: `<a:redcross:1495393630112841839> **Player Not Found**\nTag **#${playerTag}** not found. Check tag or profile privacy.`,
             flags: MessageFlags.Ephemeral,
           };
         }
@@ -236,10 +237,10 @@ export default {
       userData.recruitedAt = new Date().toISOString();
       userData.recruitedBy = interaction.member?.user?.id;
       userData.recruiterName = interaction.member?.user?.username;
-      userData.clan = clan; // Set their BOOM clan
+      userData.clan = clanConfig.clanTag; // Set their BOOM clan reference
       await setUserData(memberId, userData);
 
-      // Set nickname format: "PlayerName | CLAN"
+      // Set nickname format: "PlayerName | ABBR"
       const nickname = `${playerName} | ${clanInfo.abbr}`;
       
       try {
@@ -318,7 +319,7 @@ export default {
       console.error('Error in add command:', error);
       
       return {
-        content: "<a:redcross:1439044567415521443> **Recruitment Failed**\nAn internal error occurred while processing this request.",
+        content: "<a:redcross:1495393630112841839> **Recruitment Failed**\nAn internal error occurred while processing this request.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -337,7 +338,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: { 
-              content: "<a:Warning:1456190079830720625> This button is not for you.", 
+              content: "<a:Warning:1495394548984315904> This button is not for you.", 
               flags: MessageFlags.Ephemeral 
             }
           }
@@ -350,13 +351,13 @@ export default {
         `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
         {
           type: InteractionResponseType.UpdateMessage,
-          data: { content: "<a:redcross:1439044567415521443> **Force Add Cancelled**", components: [], flags: MessageFlags.Ephemeral }
+          data: { content: "<a:redcross:1495393630112841839> **Force Add Cancelled**", components: [], flags: MessageFlags.Ephemeral }
         }
       );
     },
 
     "add_force_confirm": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
-      const [memberId, clan, executorId] = args;
+      const [memberId, clanTag, executorId] = args;
 
       // SECURITY CHECK: Verify if the clicker is the original command runner
       if (interaction.member?.user?.id !== executorId) {
@@ -366,7 +367,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: { 
-              content: "<a:Warning:1456190079830720625> This button is not for you.", 
+              content: "<a:Warning:1495394548984315904> This button is not for you.", 
               flags: MessageFlags.Ephemeral 
             }
           }
@@ -383,7 +384,18 @@ export default {
       );
 
       try {
-        const clanInfo = CLAN_MAP[clan as keyof typeof CLAN_MAP];
+        const clanConfig = await getMainClanByTagOrName(clanTag);
+        if (!clanConfig || !clanConfig.clanRoleId || !clanConfig.clanChannelId) {
+          throw new Error("Clan is no longer configured. Run /setup clan again.");
+        }
+
+        const clanInfo = {
+          role: clanConfig.clanRoleId,
+          channel: clanConfig.clanChannelId,
+          name: clanConfig.clanName,
+          abbr: clanConfig.abbreviation,
+          tag: clanConfig.clanTag,
+        };
         const auditReason = `Force added by ${interaction.member?.user?.username} (No Link)`;
         
         // Get member info for response
@@ -410,7 +422,7 @@ export default {
         userData.recruitedAt = new Date().toISOString();
         userData.recruitedBy = interaction.member?.user?.id;
         userData.recruiterName = interaction.member?.user?.username;
-        userData.clan = clan;
+        userData.clan = clanConfig.clanTag;
         await setUserData(memberId, userData);
 
         // Assign BOOM Member role
@@ -460,11 +472,21 @@ export default {
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           { 
-            content: "<a:redcross:1439044567415521443> **Force Add Failed**\nAn internal error occurred while processing this request.",
+            content: "<a:redcross:1495393630112841839> **Force Add Failed**\nAn internal error occurred while processing this request.",
             components: [] 
           }
         );
       }
     }
+  },
+
+  async autocomplete(data: { interaction: SimplifiedInteraction }): CommandAutocompleteResult {
+    const interaction = data.interaction;
+    const options = interaction.data.options as InteractionDataOption[] | undefined;
+    const focusedOption = options?.find((option) => option.focused && option.name === "clan");
+    const focusedValue = typeof focusedOption?.value === "string" ? focusedOption.value : "";
+
+    const choices = await getMainClanAutocompleteChoices(focusedValue);
+    return { choices };
   }
 };
