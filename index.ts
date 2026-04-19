@@ -204,6 +204,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             content: commandResult?.content ?? "",
             embeds: commandResult?.embeds || [],
             components: commandResult?.components || [],
+            flags: commandResult?.flags,
           };
 
           await axios.patch(
