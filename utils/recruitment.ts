@@ -10,6 +10,7 @@ configDotenv();
 export interface ClanRecruitment {
   clan: string; // Abbreviation (WM, LE, ZP, CH, WA)
   name: string; // Full clan name
+  category: string; // Required database category
   memberCount: number; // Current members from API
   lastUpdated: number;
   clanTag?: string; // Clan tag for API calls
@@ -33,6 +34,7 @@ export class RecruitmentTracker {
     return {
       clan: row.abbreviation || row.clan_tag,
       name: row.clan_name,
+      category: row.category,
       memberCount: row.member_count ?? 0,
       lastUpdated,
       clanTag: row.clan_tag,
@@ -44,6 +46,7 @@ export class RecruitmentTracker {
       clan_tag: model.clanTag || model.clan,
       clan_name: model.name,
       abbreviation: model.clan,
+      category: model.category,
       member_count: model.memberCount,
       last_updated: new Date(model.lastUpdated).toISOString(),
       updated_at: new Date().toISOString(),
