@@ -218,11 +218,13 @@ export async function getMainClanAutocompleteChoices(input: string): Promise<Arr
 
 export async function getConfiguredClanByTagOrName(query: string): Promise<ClanSetup | null> {
   const normalizedTag = normalizeClanTag(query);
+  const normalizedQuery = query.trim().toLowerCase();
   const configuredClans = await getConfiguredClans();
 
   return (
     configuredClans.find((clan) => clan.clanTag === normalizedTag) ||
-    configuredClans.find((clan) => clan.clanName.toLowerCase() === query.trim().toLowerCase()) ||
+    configuredClans.find((clan) => clan.clanName.toLowerCase() === normalizedQuery) ||
+    configuredClans.find((clan) => clan.abbreviation.toLowerCase() === normalizedQuery) ||
     null
   );
 }
