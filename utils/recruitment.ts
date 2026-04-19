@@ -79,38 +79,91 @@ export class RecruitmentTracker {
         (existingRows || []).map((row: any) => [String(row.clan_tag).toUpperCase(), row])
       );
 
-      const rowsToUpsert: any[] = [];
+      const rowsToInsert: any[] = [];
+      const rowsToUpdate: Array<{ clanTag: string; values: any }> = [];
 
       for (const configuredClan of configuredClans) {
         const normalizedTag = configuredClan.clanTag.toUpperCase();
         const existing = existingData.get(normalizedTag) as any;
-        if (!existing || existing.member_count == null || !existing.last_updated) {
+        const now = new Date().toISOString();
+
+        if (!existing) {
+          const category = configuredClan.category;
+          const clanChannelId = configuredClan.clanChannelId;
+          const clanRoleId = configuredClan.clanRoleId;
+          const isMainClan = category === "main";
+
+          if (!category || (isMainClan && (!clanChannelId || !clanRoleId))) {
+            console.warn(
+              `⚠️ Skipping initialization for clan ${configuredClan.clanName} (#${configuredClan.clanTag}) because required config fields are missing for insert.`
+            );
+            continue;
+          }
+
           console.log(`🆕 Initializing recruitment fields for clan: ${configuredClan.clanName} (#${configuredClan.clanTag})`);
-          rowsToUpsert.push({
+          rowsToInsert.push({
             clan_tag: configuredClan.clanTag,
             clan_name: configuredClan.clanName,
             abbreviation: configuredClan.abbreviation,
+            category,
+            clan_channel_id: clanChannelId ?? null,
+            clan_role_id: clanRoleId ?? null,
             member_count: 0,
-            last_updated: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            last_updated: now,
+            updated_at: now,
+          });
+          continue;
+        }
+
+        if (existing.member_count == null || !existing.last_updated) {
+          console.log(`🆕 Initializing recruitment fields for clan: ${configuredClan.clanName} (#${configuredClan.clanTag})`);
+          rowsToUpdate.push({
+            clanTag: configuredClan.clanTag,
+            values: {
+              member_count: existing.member_count ?? 0,
+              last_updated: now,
+              updated_at: now,
+            },
           });
         }
       }
 
-      if (rowsToUpsert.length > 0) {
-        const { error: upsertError } = await (supabase as any)
+      if (rowsToInsert.length > 0) {
+        const { error: insertError } = await (supabase as any)
           .from(this.TABLE)
-          .upsert(rowsToUpsert, { onConflict: "clan_tag" });
+          .insert(rowsToInsert);
 
-        if (upsertError) {
+        if (insertError) {
           console.error("❌ Failed to initialize recruitment tracker rows:", {
-            message: upsertError?.message,
-            code: upsertError?.code,
-            details: upsertError?.details,
-            hint: upsertError?.hint,
+            message: insertError?.message,
+            code: insertError?.code,
+            details: insertError?.details,
+            hint: insertError?.hint,
           });
           return;
         }
+      }
+
+      if (rowsToUpdate.length > 0) {
+        for (const rowToUpdate of rowsToUpdate) {
+          const { error: updateError } = await (supabase as any)
+            .from(this.TABLE)
+            .update(rowToUpdate.values)
+            .eq("clan_tag", rowToUpdate.clanTag);
+
+          if (updateError) {
+            console.error("❌ Failed to initialize recruitment tracker rows:", {
+              message: updateError?.message,
+              code: updateError?.code,
+              details: updateError?.details,
+              hint: updateError?.hint,
+            });
+            return;
+          }
+        }
+      }
+
+      if (rowsToInsert.length > 0 || rowsToUpdate.length > 0) {
         console.log("✅ Recruitment tracker updated with new clans");
       }
     } catch (error) {
