@@ -250,7 +250,7 @@ export async function getConfiguredClanAutocompleteChoices(input: string): Promi
 }
 
 export async function resolveUserClanLabel(userClanValue: string): Promise<string> {
-  const clan = await getClanByTag(userClanValue);
+  const clan = await getConfiguredClanByTagOrName(userClanValue);
   if (clan) {
     return clan.clanName;
   }
