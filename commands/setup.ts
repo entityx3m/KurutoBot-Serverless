@@ -39,14 +39,6 @@ function getOptionValue(options: InteractionOption[] | undefined, name: string):
   return typeof option.value === "string" ? option.value : undefined;
 }
 
-function generateClanAbbreviation(clanName: string): string {
-  // Extract first letter of each word (e.g., "WAR MASTER" -> "WM", "Legends" -> "L")
-  return clanName
-    .split(/\s+/)
-    .map((word) => word[0].toUpperCase())
-    .join("");
-}
-
 export default {
   data: {
     name: "setup",
