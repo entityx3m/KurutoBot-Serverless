@@ -1,4 +1,4 @@
-import { CLANS, CHANNEL_IDS, ROLE_IDS } from "./config";
+import { CHANNEL_IDS, ROLE_IDS } from "./config";
 
 // Re-export for backward compatibility
 export const IDS = {
@@ -6,19 +6,6 @@ export const IDS = {
   CHANNELS: CHANNEL_IDS
 };
 
-// Create a map compatible with existing code
-export const CLAN_MAP = Object.fromEntries(
-  Object.entries(CLANS).map(([key, clan]) => [
-    key,
-    {
-      role: clan.roleId,
-      channel: clan.channelId,
-      name: clan.name,
-      abbr: clan.abbr,
-      tag: clan.tag
-    }
-  ])
-) as Record<string, any>;
 // Helper function to send welcome DM
 export async function sendWelcomeDM(memberId: string, clanInfo: any): Promise<void> {
   try {
@@ -35,7 +22,7 @@ export async function sendWelcomeDM(memberId: string, clanInfo: any): Promise<vo
       const dmChannel = await dmChannelResponse.json();
 
       const dmEmbed = {
-        title: `<a:pepopalmas:1409737253130993704> Congratulations! You are now a ${clanInfo.name} Member!`,
+        title: `<a:pepopalmas:1495395645735829564> Congratulations! You are now a ${clanInfo.name} Member!`,
         thumbnail: {
           url: "https://cdn.discordapp.com/attachments/1412097601289064609/1430484430425948270/Picsart_25-10-22_17-08-58-571.png?ex=69179bb1&is=69164a31&hm=85819bb5eb797fc5994da98ff62dfb841885ee87eecf8beb8b4617e47a70dfe1"
         },
@@ -97,7 +84,7 @@ export async function sendClanWelcome(
   clanInfo: any
 ): Promise<void> {
   try {
-    const content = `Welcome <@${memberId}> to your clan's general chat! <a:heya:1427561870797180928> — feel free to look around! <a:KnightCheergif:1427561243811647548>`;
+    const content = `Welcome <@${memberId}> to your clan's general chat! <a:heya:1495395980021858566> — feel free to look around! <a:KnightCheergif:1495396229754916874>`;
 
     await fetch(`https://discord.com/api/v10/channels/${clanInfo.channel}/messages`, {
       method: "POST",
@@ -165,11 +152,11 @@ export async function processVisitorRole(
 // Helper function to get visitor message
 export function getVisitorMessage(visitorStatus: string): string {
   if (visitorStatus === "removed") {
-    return `<a:AnimatedCheck:1427570005750448169> Removed **Visitor** role.\n`;
+    return `<a:AnimatedCheck:1495392848072413275> Removed **Visitor** role.\n`;
   } else if (visitorStatus === "not_present") {
-    return `<a:redcross:1439044567415521443> **Visitor** role not present.\n`;
+    return `<a:redcross:1495393630112841839> **Visitor** role not present.\n`;
   } else {
-    return `<a:redcross:1439044567415521443> Could not check/remove **Visitor** role.\n`;
+    return `<a:redcross:1495393630112841839> Could not check/remove **Visitor** role.\n`;
   }
 }
 
@@ -188,19 +175,19 @@ export function createNormalAddResultContent(
   executorId?: string
 ): string {
   const linkingStatus = wasNewlyLinked
-    ? `<a:AnimatedCheck:1427570005750448169> **Account Linked:** ${playerName} | TH${thLevel} (#${playerTag}) added to their profile\n`
-    : `<a:AnimatedCheck:1427570005750448169> **Account Already Linked:** Using existing account ${playerName} | TH${thLevel} (#${playerTag})\n`;
+    ? `<a:AnimatedCheck:1495392848072413275> **Account Linked:** ${playerName} | TH${thLevel} (#${playerTag}) added to their profile\n`
+    : `<a:AnimatedCheck:1495392848072413275> **Account Already Linked:** Using existing account ${playerName} | TH${thLevel} (#${playerTag})\n`;
 
   const verifiedMessage = verifiedAssigned ? `**Verified**, ` : "";
 
   return (
-    `<a:AnimatedCheck:1427570005750448169> **${memberUsername}** has been accepted into **${clanInfo.name}** by <@${executorId}>.\n` +
-    `<a:AnimatedCheck:1427570005750448169> **Nickname set to:** ${nickname}\n` +
+    `<a:AnimatedCheck:1495392848072413275> **${memberUsername}** has been accepted into **${clanInfo.name}** by <@${executorId}>.\n` +
+    `<a:AnimatedCheck:1495392848072413275> **Nickname set to:** ${nickname}\n` +
     linkingStatus +
     visitorMessage +
-    `<a:AnimatedCheck:1427570005750448169> Assigned ${verifiedMessage}**BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
-    `<a:AnimatedCheck:1427570005750448169> A welcome DM has been sent. 📩\n` +
-    `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`
+    `<a:AnimatedCheck:1495392848072413275> Assigned ${verifiedMessage}**BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
+    `<a:AnimatedCheck:1495392848072413275> A welcome DM has been sent. 📩\n` +
+    `<a:AnimatedCheck:1495392848072413275> Introduced them in <#${clanInfo.channel}>`
   );
 }
 
@@ -213,13 +200,13 @@ export function createForceAddResultContent(
   executorId?: string
 ): string {
   return (
-    `<a:AnimatedCheck:1427570005750448169> **${memberUsername}** has been **force added** into **${clanInfo.name}** by <@${executorId}>.\n` +
-    `<a:red_warning:1463226880630198476> **Manual Actions Required:**\n` +
+    `<a:AnimatedCheck:1495392848072413275> **${memberUsername}** has been **force added** into **${clanInfo.name}** by <@${executorId}>.\n` +
+    `<a:red_warning:1495394167877009549> **Manual Actions Required:**\n` +
     `• Update their nickname manually.\n` +
     `• Verify their account manually if needed.\n` +
     visitorMessage +
-    `<a:AnimatedCheck:1427570005750448169> Assigned **BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
-    `<a:AnimatedCheck:1427570005750448169> A welcome DM has been sent. 📩\n` +
-    `<a:AnimatedCheck:1427570005750448169> Introduced them in <#${clanInfo.channel}>`
+    `<a:AnimatedCheck:1495392848072413275> Assigned **BOOM Member** and **${clanInfo.name} Member** Roles.\n` +
+    `<a:AnimatedCheck:1495392848072413275> A welcome DM has been sent. 📩\n` +
+    `<a:AnimatedCheck:1495392848072413275> Introduced them in <#${clanInfo.channel}>`
   );
 }

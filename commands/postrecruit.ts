@@ -29,7 +29,7 @@ export default {
     
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+        content: "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -47,7 +47,7 @@ export default {
     } catch (error) {
       console.error("Error posting recruitment:", error);
       return {
-        content: "<a:redcross:1439044567415521443> Failed to post recruitment status 💀",
+        content: "<a:redcross:1495393630112841839> Failed to post recruitment status 💀",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -62,7 +62,7 @@ export default {
           `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
           {
             type: InteractionResponseType.ChannelMessageWithSource,
-            data: { content: "<a:redcross:1439044567415521443> Wrong server!", flags: MessageFlags.Ephemeral }
+            data: { content: "<a:redcross:1495393630112841839> Wrong server!", flags: MessageFlags.Ephemeral }
           }
         );
         return;

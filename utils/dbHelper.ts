@@ -34,7 +34,7 @@ export interface UserData {
   recruitedAt?: string;
   recruitedBy?: string;
   recruiterName?: string;
-  clan?: string; // Current BOOM clan (WM, LE, ZP, CH)
+  clan?: string; // Current BOOM clan tag from clans
   nickname?: string;
   lastUpdated: string;
 }

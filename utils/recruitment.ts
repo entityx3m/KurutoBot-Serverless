@@ -1,13 +1,14 @@
 // utils/recruitment.ts
 import { configDotenv } from "dotenv";
-import { CLAN_TAGS, CLAN_NAMES, MAX_CLAN_SIZE } from "./config";
+import { MAX_CLAN_SIZE } from "./config";
 import { cocApi } from "./cocApi";
 import { supabase } from "./db";
+import { getConfiguredClans } from "./clanSetup";
 
 configDotenv();
 
 export interface ClanRecruitment {
-  clan: string; // WM, LE, ZP, CH, SP
+  clan: string; // Abbreviation (WM, LE, ZP, CH, WA)
   name: string; // Full clan name
   memberCount: number; // Current members from API
   lastUpdated: number;
@@ -15,7 +16,7 @@ export interface ClanRecruitment {
 }
 
 export class RecruitmentTracker {
-  private static readonly TABLE = "clan_recruitment";
+  private static readonly TABLE = "clans";
   private static readonly MAX_CLAN_SIZE = MAX_CLAN_SIZE;
 
   private static isMissingTableError(error: any): boolean {
@@ -30,27 +31,33 @@ export class RecruitmentTracker {
         : new Date(lastUpdatedValue || Date.now()).getTime();
 
     return {
-      clan: row.clan,
-      name: row.name,
+      clan: row.abbreviation || row.clan_tag,
+      name: row.clan_name,
       memberCount: row.member_count ?? 0,
       lastUpdated,
-      clanTag: row.clan_tag || undefined,
+      clanTag: row.clan_tag,
     };
   }
 
   private static modelToRow(model: ClanRecruitment) {
     return {
-      clan: model.clan,
-      name: model.name,
+      clan_tag: model.clanTag || model.clan,
+      clan_name: model.name,
+      abbreviation: model.clan,
       member_count: model.memberCount,
       last_updated: new Date(model.lastUpdated).toISOString(),
-      clan_tag: model.clanTag || null,
+      updated_at: new Date().toISOString(),
     };
   }
 
   static async initialize(): Promise<void> {
     try {
-      const { data: existingRows, error: existingError } = await supabase
+      const configuredClans = await getConfiguredClans();
+      if (configuredClans.length === 0) {
+        return;
+      }
+
+      const { data: existingRows, error: existingError } = await (supabase as any)
         .from(this.TABLE)
         .select("*");
 
@@ -59,48 +66,60 @@ export class RecruitmentTracker {
           console.warn(`⚠️ Table ${this.TABLE} is missing. Run the Supabase migration SQL before using recruitment tracker.`);
           return;
         }
-        console.error("❌ Failed to load recruitment tracker rows:", existingError);
+        console.error("❌ Failed to load recruitment tracker rows:", {
+          message: existingError?.message,
+          code: existingError?.code,
+          details: existingError?.details,
+          hint: existingError?.hint,
+        });
         return;
       }
 
       const existingData = new Map(
-        (existingRows || []).map((row) => [String(row.clan).toUpperCase(), row])
+        (existingRows || []).map((row: any) => [String(row.clan_tag).toUpperCase(), row])
       );
 
-      // Define all required clans
-      const requiredClans = Object.keys(CLAN_TAGS);
       const rowsToUpsert: any[] = [];
 
-      // Check if any clans are missing and add them
-      for (const clanKey of requiredClans) {
-        if (!existingData.has(clanKey.toUpperCase())) {
-          console.log(`🆕 Initializing missing clan: ${clanKey}`);
+      for (const configuredClan of configuredClans) {
+        const normalizedTag = configuredClan.clanTag.toUpperCase();
+        const existing = existingData.get(normalizedTag) as any;
+        if (!existing || existing.member_count == null || !existing.last_updated) {
+          console.log(`🆕 Initializing recruitment fields for clan: ${configuredClan.clanName} (#${configuredClan.clanTag})`);
           rowsToUpsert.push({
-            clan: clanKey,
-            name: CLAN_NAMES[clanKey as keyof typeof CLAN_NAMES],
+            clan_tag: configuredClan.clanTag,
+            clan_name: configuredClan.clanName,
+            abbreviation: configuredClan.abbreviation,
             member_count: 0,
             last_updated: new Date().toISOString(),
-            clan_tag: CLAN_TAGS[clanKey as keyof typeof CLAN_TAGS],
+            updated_at: new Date().toISOString(),
           });
         }
       }
 
       if (rowsToUpsert.length > 0) {
-        const { error: upsertError } = await supabase
+        const { error: upsertError } = await (supabase as any)
           .from(this.TABLE)
-          .upsert(rowsToUpsert, { onConflict: "clan" });
+          .upsert(rowsToUpsert, { onConflict: "clan_tag" });
 
         if (upsertError) {
-          console.error("❌ Failed to initialize recruitment tracker rows:", upsertError);
+          console.error("❌ Failed to initialize recruitment tracker rows:", {
+            message: upsertError?.message,
+            code: upsertError?.code,
+            details: upsertError?.details,
+            hint: upsertError?.hint,
+          });
           return;
         }
         console.log("✅ Recruitment tracker updated with new clans");
       }
     } catch (error) {
-      console.error(
-        "❌ Failed to initialize recruitment tracker:",
-        error
-      );
+      const cause = error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined;
+      console.error("❌ Failed to initialize recruitment tracker:", {
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : "UnknownError",
+        cause: cause instanceof Error ? cause.message : cause,
+      });
     }
   }
 
@@ -113,8 +132,7 @@ export class RecruitmentTracker {
       const clans = await this.getAllClans();
 
       for (const clan of clans) {
-        const clanTag =
-          clan.clanTag || CLAN_TAGS[clan.clan as keyof typeof CLAN_TAGS];
+        const clanTag = clan.clanTag || clan.clan;
 
         if (clanTag) {
           try {
@@ -126,14 +144,10 @@ export class RecruitmentTracker {
               // Update member count
               clan.memberCount = memberCount;
               clan.lastUpdated = Date.now();
-              // Ensure name is up to date
-              if (!clan.name && CLAN_NAMES[clan.clan as keyof typeof CLAN_NAMES]) {
-                clan.name = CLAN_NAMES[clan.clan as keyof typeof CLAN_NAMES];
-              }
 
-              const { error: updateError } = await supabase
+              const { error: updateError } = await (supabase as any)
                 .from(this.TABLE)
-                .upsert(this.modelToRow(clan), { onConflict: "clan" });
+                .upsert(this.modelToRow(clan), { onConflict: "clan_tag" });
 
               if (updateError) {
                 console.warn(`⚠️ Failed updating ${clan.name} in Supabase:`, updateError);
@@ -158,10 +172,11 @@ export class RecruitmentTracker {
 
   static async getClan(clan: string): Promise<ClanRecruitment | null> {
     try {
-      const { data, error } = await supabase
+      const normalized = clan.trim().toUpperCase();
+      const { data, error } = await (supabase as any)
         .from(this.TABLE)
         .select("*")
-        .eq("clan", clan.toUpperCase())
+        .or(`clan_tag.eq.${normalized},abbreviation.eq.${normalized}`)
         .maybeSingle();
 
       if (error) {
@@ -181,7 +196,9 @@ export class RecruitmentTracker {
 
   static async getAllClans(): Promise<ClanRecruitment[]> {
     try {
-      const { data, error } = await supabase
+      const configuredClans = await getConfiguredClans();
+
+      const { data, error } = await (supabase as any)
         .from(this.TABLE)
         .select("*");
 
@@ -193,12 +210,24 @@ export class RecruitmentTracker {
         return [];
       }
 
-      // Sort clans to keep order consistent
-      const clanOrder = Object.keys(CLAN_TAGS);
+      const clanOrder = configuredClans.map((clan) => clan.clanTag.toUpperCase());
 
       return data
-        ? data.map((row) => this.rowToModel(row)).sort((a, b) => {
-            return clanOrder.indexOf(a.clan) - clanOrder.indexOf(b.clan);
+        ? data.map((row: any) => this.rowToModel(row)).sort((a: ClanRecruitment, b: ClanRecruitment) => {
+            const left = clanOrder.indexOf((a.clanTag || "").toUpperCase());
+            const right = clanOrder.indexOf((b.clanTag || "").toUpperCase());
+
+            if (left === -1 && right === -1) {
+              return a.name.localeCompare(b.name);
+            }
+            if (left === -1) {
+              return 1;
+            }
+            if (right === -1) {
+              return -1;
+            }
+
+            return left - right;
           })
         : [];
     } catch (error) {
@@ -248,7 +277,4 @@ export class RecruitmentTracker {
   }
 }
 
-// Initialize eagerly only when the service role env is available at import time.
-if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  RecruitmentTracker.initialize().catch(console.error);
-}
+// Initialization is intentionally lazy to avoid startup failures on transient Supabase outages.
