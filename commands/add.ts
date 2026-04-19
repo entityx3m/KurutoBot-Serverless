@@ -129,6 +129,13 @@ export default {
           // Get the ID of the staff member running the command
           const executorId = interaction.member?.user?.id;
 
+          if (!executorId) {
+            return {
+              content: "Unable to create the confirmation buttons because the executor identity could not be determined. Please run this command again from the server.",
+              flags: MessageFlags.Ephemeral,
+            };
+          }
+
           return {
             content: `<a:red_warning:1495394167877009549> **No Linked Account Found**\n\n<@${memberId}> has not linked their Clash of Clans account.\n\n**If you proceed:**\n• Nickname will **NOT** be updated automatically.\n• "Verified" role will **NOT** be assigned.\n• You must handle these manually.\n\nDo you want to force add them anyway?`,
             flags: MessageFlags.Ephemeral,
