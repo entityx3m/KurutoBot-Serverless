@@ -84,6 +84,8 @@ type ClanSetupSeedRow = {
   updated_at: string;
 };
 
+const MIN_VALID_CLAN_TAG_LENGTH = 5;
+
 function normalizeTag(tag: string | undefined): string {
   if (!tag) return "";
   return tag.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -150,38 +152,12 @@ const CLAN_ENV_DEFINITIONS: ClanEnvDefinition[] = [
   },
 ];
 
-function buildLegacyClanTagLookup(): Record<string, string> {
-  const lookup: Record<string, string> = {};
-
-  for (const clan of CLAN_ENV_DEFINITIONS) {
-    const normalizedTag = normalizeTag(clan.tag);
-    if (!normalizedTag) continue;
-    lookup[clan.abbreviation.toUpperCase()] = normalizedTag;
-  }
-
-  return lookup;
-}
-
-const LEGACY_CLAN_TAG_LOOKUP = buildLegacyClanTagLookup();
-
-function translateLegacyClanToTag(value: string | undefined): string | null {
-  if (!value) return null;
-
-  const trimmedValue = value.trim();
-  if (!trimmedValue) return null;
-
-  const abbreviationMatch = LEGACY_CLAN_TAG_LOOKUP[trimmedValue.toUpperCase()];
-  if (abbreviationMatch) return abbreviationMatch;
-
-  return normalizeTag(trimmedValue);
-}
-
 function buildClanSetupSeedRowsFromEnv(): ClanSetupSeedRow[] {
   const nowIso = new Date().toISOString();
   const rows: ClanSetupSeedRow[] = [];
 
   for (const candidate of CLAN_ENV_DEFINITIONS) {
-    const normalizedTag = translateLegacyClanToTag(candidate.tag);
+    const normalizedTag = normalizeTag(candidate.tag);
     if (!normalizedTag) continue;
 
     rows.push({
@@ -232,7 +208,7 @@ function normalizeLegacyClanValue(
     return mapped;
   }
 
-  if (normalizedTag.length >= 5) {
+  if (normalizedTag && normalizedTag.length >= MIN_VALID_CLAN_TAG_LENGTH) {
     return normalizedTag;
   }
 
