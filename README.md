@@ -42,6 +42,8 @@ public/      Static assets
 ## Main Commands
 
 - /add: accept a member into a BOOM clan (roles, nickname, welcome flow)
+- /legend leaderboard: show a trophy ranking across the alliance with pagination and refresh
+- /setup clan: link/unlink BOOM clans in database-backed setup
 - /link: link a Clash of Clans account to a Discord member
 - /unlink: unlink one of a member's Clash accounts
 - /player: inspect linked accounts or lookup any player by tag
@@ -104,29 +106,11 @@ The application now uses fail-fast config for critical values. Missing required 
 | TICKET_CREATION_URL | Full URL used in verification quick-navigation embeds |
 | SUPABASE_URL | Supabase project URL |
 | SUPABASE_SERVICE_ROLE_KEY | Supabase key used by app reads/writes |
-| CLAN_TAG_WM | Clan tag for War Master |
-| CLAN_TAG_LE | Clan tag for LEGENDS |
-| CLAN_TAG_ZP | Clan tag for ZwartePiet |
-| CLAN_TAG_CH | Clan tag for Clash Heros |
-| CLAN_TAG_SP | Clan tag for SP.OPS.DIVISION |
-| CLAN_TAG_WA | Clan tag for War Addiction |
 | ROLE_BOOM_MEMBER_ID | BOOM member role ID |
-| ROLE_WM_ID | War Master role ID |
-| ROLE_LE_ID | Legends role ID |
-| ROLE_ZP_ID | ZwartePiet role ID |
-| ROLE_CH_ID | Clash Heros role ID |
-| ROLE_SP_ID | SP.OPS.DIVISION role ID |
-| ROLE_WA_ID | War Addiction role ID |
 | ROLE_TICKET_JOIN_LEADERSHIP_ID | Staff role for join-clan ticket actions |
 | ROLE_TICKET_STAFF_LEADERSHIP_ID | Staff role for staff/chat ticket actions |
 | ROLE_VISITOR_ID | Visitor role ID |
 | ROLE_VERIFIED_ID | Verified role ID |
-| CHANNEL_WM_ID | WM channel ID |
-| CHANNEL_LE_ID | LE channel ID |
-| CHANNEL_ZP_ID | ZP channel ID |
-| CHANNEL_CH_ID | CH channel ID |
-| CHANNEL_SP_ID | SP channel ID |
-| CHANNEL_WA_ID | WA channel ID |
 | CHANNEL_CLANS_LIST_ID | Clan list channel ID |
 | CHANNEL_ATTACK_PLANNING_ID | Attack planning channel ID |
 | CHANNEL_FUN_CATEGORY_ID | Fun category/channel ID |
@@ -142,11 +126,15 @@ The application now uses fail-fast config for critical values. Missing required 
 | --- | --- |
 | FLASK_API_URL | Optional endpoint used by /ping |
 | MIGRATION_KV_PREFIX | Optional key prefix override for KV migration |
+| CLAN_TAG_WM / CLAN_TAG_LE / CLAN_TAG_ZP / CLAN_TAG_CH / CLAN_TAG_WA | Optional migration seeding inputs for main clans |
+| ROLE_WM_ID / ROLE_LE_ID / ROLE_ZP_ID / ROLE_CH_ID / ROLE_WA_ID | Optional migration seeding inputs for main clan roles |
+| CHANNEL_WM_ID / CHANNEL_LE_ID / CHANNEL_ZP_ID / CHANNEL_CH_ID / CHANNEL_WA_ID | Optional migration seeding inputs for main clan channels |
 
 ## Data Model (High Level)
 
 - users table: Discord-centric profile metadata
 - accounts table: linked Clash accounts keyed by player tag
+- clans table: BOOM clan configuration + recruitment member counts managed by /setup clan and /postrecruit
 - one main account per Discord user
 
 Migration helper:

@@ -47,7 +47,7 @@ export default {
 
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+        content: "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -55,7 +55,7 @@ export default {
     const userId = interaction.member?.user?.id;
     if (!userId) {
       return {
-        content: "<a:redcross:1439044567415521443> Could not identify user.",
+        content: "<a:redcross:1495393630112841839> Could not identify user.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -67,7 +67,7 @@ export default {
     const userData = await getUserData(userId);
     if (!userData || userData.accounts.length === 0) {
       return {
-        content: "<a:redcross:1439044567415521443> You don't have any linked CoC accounts.",
+        content: "<a:redcross:1495393630112841839> You don't have any linked CoC accounts.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -126,7 +126,7 @@ export default {
     const playerTag = rawPlayerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!/^[A-Z0-9]{3,15}$/.test(playerTag)) {
       return {
-        content: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+        content: "<a:redcross:1495393630112841839> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -135,7 +135,7 @@ export default {
     const accountIndex = userData.accounts.findIndex(acc => acc.playerTag === playerTag);
     if (accountIndex === -1) {
       return {
-        content: `<a:redcross:1439044567415521443> **Account Not Found**\nYou don't have account #${playerTag} linked to your profile.`,
+        content: `<a:redcross:1495393630112841839> **Account Not Found**\nYou don't have account #${playerTag} linked to your profile.`,
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -188,7 +188,7 @@ export default {
     // Save updated data
     await setUserData(userId, userData);
 
-    let responseText = `<a:AnimatedCheck:1427570005750448169> **Account Unlinked Successfully!**\n\n` +
+    let responseText = `<a:AnimatedCheck:1495392848072413275> **Account Unlinked Successfully!**\n\n` +
       `**👤 Account:** ${accountToRemove.playerName}\n` +
       `**🏷️ Player Tag:** #${accountToRemove.playerTag}\n\n`;
     
@@ -222,7 +222,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:redcross:1439044567415521443> This button is not for you.",
+              content: "<a:redcross:1495393630112841839> This button is not for you.",
               flags: MessageFlags.Ephemeral,
             },
           }
@@ -245,7 +245,7 @@ export default {
           await axios.patch(
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
-              content: "<a:redcross:1439044567415521443> No user data found.",
+              content: "<a:redcross:1495393630112841839> No user data found.",
               flags: MessageFlags.Ephemeral,
             }
           );
@@ -258,7 +258,7 @@ export default {
           await axios.patch(
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
-              content: `<a:redcross:1439044567415521443> Account #${playerTag} not found.`,
+              content: `<a:redcross:1495393630112841839> Account #${playerTag} not found.`,
               flags: MessageFlags.Ephemeral,
             }
           );
@@ -311,7 +311,7 @@ export default {
         await setUserData(userId, userData);
 
         // Build response
-        let responseText = `<a:AnimatedCheck:1427570005750448169> **Account Unlinked Successfully!**\n\n` +
+        let responseText = `<a:AnimatedCheck:1495392848072413275> **Account Unlinked Successfully!**\n\n` +
           `**👤 Account:** ${accountToRemove.playerName}\n` +
           `**🏷️ Player Tag:** #${accountToRemove.playerTag}\n\n`;
         
@@ -338,7 +338,7 @@ export default {
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           {
-            content: `<a:redcross:1439044567415521443> **Unlink Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
+            content: `<a:redcross:1495393630112841839> **Unlink Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
             flags: MessageFlags.Ephemeral,
           }
         );
