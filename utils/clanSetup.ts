@@ -206,7 +206,8 @@ export async function getMainClanAutocompleteChoices(input: string): Promise<Arr
       if (!normalizedInput) return true;
       return (
         clan.clanName.toLowerCase().includes(normalizedInput) ||
-        clan.clanTag.toLowerCase().includes(normalizedInput)
+        clan.clanTag.toLowerCase().includes(normalizedInput) ||
+        clan.abbreviation.toLowerCase().includes(normalizedInput)
       );
     })
     .slice(0, 25)
