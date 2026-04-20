@@ -41,17 +41,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_one_main_per_user
 ON accounts (discord_id)
 WHERE is_main = TRUE;
 
--- Extra table replacing boom_house_recruitment hash storage.
-CREATE TABLE IF NOT EXISTS clan_recruitment (
-  clan TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
+-- Unified source of truth for server-configured clans and recruitment values.
+CREATE TABLE IF NOT EXISTS clans (
+  clan_tag TEXT PRIMARY KEY,
+  clan_name TEXT NOT NULL,
+  abbreviation TEXT NOT NULL,
+  category TEXT NOT NULL,
+  clan_channel_id TEXT,
+  clan_role_id TEXT,
   member_count INTEGER NOT NULL DEFAULT 0,
   last_updated TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  clan_tag TEXT
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  CONSTRAINT clans_category_check CHECK (
+    category IN ('main_clan', 'cwl_clan', 'alt_clan')
+  )
 );
 
-ALTER TABLE clan_recruitment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clans ENABLE ROW LEVEL SECURITY;
 
--- Helpful read ordering index for summaries.
-CREATE INDEX IF NOT EXISTS idx_clan_recruitment_clan
-ON clan_recruitment (clan);
+CREATE INDEX IF NOT EXISTS idx_clans_category ON clans (category);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clans_clan_name ON clans (clan_name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clans_abbreviation ON clans (abbreviation);
+CREATE INDEX IF NOT EXISTS idx_clans_last_updated ON clans (last_updated);

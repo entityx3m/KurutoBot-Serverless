@@ -34,6 +34,29 @@ export interface ClanData {
   [key: string]: any;
 }
 
+export interface ClanMemberData {
+  tag: string;
+  name: string;
+  trophies?: number;
+  league?: {
+    name?: string;
+    iconUrls?: {
+      small?: string;
+      medium?: string;
+      large?: string;
+    };
+  };
+  leagueTier?: {
+    name?: string;
+    iconUrls?: {
+      small?: string;
+      medium?: string;
+      large?: string;
+    };
+  };
+  [key: string]: any;
+}
+
 export interface CocApiError {
   success: false;
   status: number;
@@ -193,6 +216,73 @@ class CocApi {
   }
 
   /**
+   * Get clan member list from Clash of Clans API
+   */
+  async getClanMembers(clanTag: string): Promise<CocApiResponse<ClanMemberData[]>> {
+    try {
+      if (!this.apiKey) {
+        return {
+          success: false,
+          status: 500,
+          statusText: "Internal Server Error",
+          message: "CoC service is currently unavailable"
+        };
+      }
+
+      const cleanTag = VALIDATION.cleanPlayerTag(clanTag);
+
+      const response = await fetch(`${this.baseUrl}/clans/%23${cleanTag}/members`, {
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Accept": "application/json"
+        },
+        signal: AbortSignal.timeout(this.requestTimeoutMs)
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            success: false,
+            status: 404,
+            statusText: "Not Found",
+            message: `Clan #${cleanTag} not found.`
+          };
+        }
+        return {
+          success: false,
+          status: response.status,
+          statusText: "Upstream Error",
+          message: "Failed to fetch clan members from CoC service"
+        };
+      }
+
+      const data = await response.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+
+      return {
+        success: true,
+        data: items
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError") {
+        return {
+          success: false,
+          status: 504,
+          statusText: "Gateway Timeout",
+          message: "CoC service timed out"
+        };
+      }
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return {
+        success: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        message: errorMessage
+      };
+    }
+  }
+
+  /**
    * Validate a player tag and return cleaned version
    */
   validateAndCleanTag(tag: string): { valid: boolean; cleanTag: string; error?: string } {
@@ -202,7 +292,7 @@ class CocApi {
       return {
         valid: false,
         cleanTag,
-        error: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
+        error: "<a:redcross:1495393630112841839> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
       };
     }
 

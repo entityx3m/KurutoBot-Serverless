@@ -34,7 +34,7 @@ export async function linkPlayerAccount(
       return {
         success: false,
         message:
-          "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
+          "<a:redcross:1495393630112841839> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
       };
     }
 
@@ -45,7 +45,7 @@ export async function linkPlayerAccount(
     if (existingUserId && existingUserId !== userId) {
       return {
         success: false,
-        message: `<a:redcross:1439044567415521443> **Tag Already Used**\nAccount **#${cleanTag}** is already linked to another user.`
+        message: `<a:redcross:1495393630112841839> **Tag Already Used**\nAccount **#${cleanTag}** is already linked to another user.`
       };
     }
 
@@ -70,7 +70,7 @@ export async function linkPlayerAccount(
       return {
         success: true,
         alreadyLinked: true,
-        message: `<a:AnimatedCheck:1427570005750448169> **Account Already Linked**\nAccount **#${cleanTag}** (${existingAccount.playerName}) is already linked to your profile.\n\n**👤 Account:** ${existingAccount.playerName}\n**🏷️ Tag:** #${cleanTag}\n**🏰 TH:** Level ${existingAccount.townHallLevel}\n\nUse **My Accounts** button or \`/player\` to view all your linked accounts.`,
+        message: `<a:AnimatedCheck:1495392848072413275> **Account Already Linked**\nAccount **#${cleanTag}** (${existingAccount.playerName}) is already linked to your profile.\n\n**👤 Account:** ${existingAccount.playerName}\n**🏷️ Tag:** #${cleanTag}\n**🏰 TH:** Level ${existingAccount.townHallLevel}\n\nUse **My Accounts** button or \`/player\` to view all your linked accounts.`,
         userData,
         playerData: null,
         isFirstAccount: false,
@@ -84,7 +84,7 @@ export async function linkPlayerAccount(
     if (!cocResult.success) {
       return {
         success: false,
-        message: `<a:redcross:1439044567415521443> **Player Not Found**\n${cocResult.message}`
+        message: `<a:redcross:1495393630112841839> **Player Not Found**\n${cocResult.message}`
       };
     }
 
@@ -131,7 +131,7 @@ export async function linkPlayerAccount(
     if (!saved) {
       return {
         success: false,
-        message: `<a:redcross:1439044567415521443> **Linking Failed**\nFailed to save linked account data. Please try again.`
+        message: `<a:redcross:1495393630112841839> **Linking Failed**\nFailed to save linked account data. Please try again.`
       };
     }
 
@@ -189,7 +189,7 @@ export async function linkPlayerAccount(
 
     return {
       success: true,
-      message: `<a:AnimatedCheck:1427570005750448169> **Account Successfully Linked!**\n**👤 CoC Account:** ${playerName}\n**🏷️ Player Tag:** #${cleanTag}\n**🏰 Town Hall:** Level ${thLevel}`,
+      message: `<a:AnimatedCheck:1495392848072413275> **Account Successfully Linked!**\n**👤 CoC Account:** ${playerName}\n**🏷️ Player Tag:** #${cleanTag}\n**🏰 Town Hall:** Level ${thLevel}`,
       userData,
       playerData,
       isFirstAccount,
@@ -199,7 +199,7 @@ export async function linkPlayerAccount(
     console.error("Error in linkPlayerAccount:", error);
     return {
       success: false,
-      message: `<a:redcross:1439044567415521443> **Linking Failed**\n${
+      message: `<a:redcross:1495393630112841839> **Linking Failed**\n${
         error instanceof Error ? error.message : "Unknown error"
       }`
     };
@@ -221,7 +221,7 @@ export function validatePlayerTag(tag: string): {
       valid: false,
       cleanTag,
       error:
-        "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
+        "<a:redcross:1495393630112841839> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`"
     };
   }
 
@@ -349,7 +349,7 @@ export function createEnhancedLinkSuccessMessage(
   nicknameUpdated: boolean,
   mainAccount?: PlayerAccount
 ): string {
-  let message = `<a:AnimatedCheck:1427570005750448169> **Account Successfully Linked!**\n\n`;
+  let message = `<a:AnimatedCheck:1495392848072413275> **Account Successfully Linked!**\n\n`;
   
   message += `**👤 CoC Account:** ${playerName}\n`;
   message += `**🏷️ Player Tag:** #${playerTag}\n`;
@@ -401,7 +401,7 @@ export function createRestoreSuccessMessage(
   nicknameUpdated: boolean,
   mainAccount?: PlayerAccount
 ): string {
-  let message = `<a:heya:1427561870797180928> **Welcome Back!**\n\n`;
+  let message = `<a:heya:1495395980021858566> **Welcome Back!**\n\n`;
   message += `I found ${accounts.length} linked CoC account${accounts.length > 1 ? 's' : ''} on your profile.\n\n`;
   
   message += `**📋 Your Linked Accounts:**\n`;
