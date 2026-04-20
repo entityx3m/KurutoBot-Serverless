@@ -14,6 +14,7 @@ import type {
 import { getUserData } from "../utils/dbHelper";
 import { linkPlayerAccount } from "../utils/linkHelper";
 import { MAIN_SERVER_ID } from "../utils/config";
+import { resolveUserClanLabel } from "../utils/clanSetup";
 
 type InteractionOption = { name: string; value: string };
 
@@ -42,7 +43,7 @@ export default {
 
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+        content: "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -51,7 +52,7 @@ export default {
     const rawPlayerTag = getOptionValue(options, "player_tag");
     if (typeof rawPlayerTag !== "string" || !rawPlayerTag) {
       return {
-        content: "<a:redcross:1439044567415521443> Please provide your player tag.\n\nExample: `/link player_tag:#ABC123`",
+        content: "<a:redcross:1495393630112841839> Please provide your player tag.\n\nExample: `/link player_tag:#ABC123`",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -59,7 +60,7 @@ export default {
     const userId = interaction.member?.user?.id;
     if (!userId) {
       return {
-        content: "<a:redcross:1439044567415521443> Could not identify you.",
+        content: "<a:redcross:1495393630112841839> Could not identify you.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -68,7 +69,7 @@ export default {
     const playerTag = rawPlayerTag.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!/^[A-Z0-9]{3,15}$/.test(playerTag)) {
       return {
-        content: "<a:redcross:1439044567415521443> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
+        content: "<a:redcross:1495393630112841839> **Invalid Player Tag**\nExample: `#ABCDEFGH` or just `ABCDEFGH`",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -133,7 +134,7 @@ export default {
     } catch (error: unknown) {
       console.error('Error in link command:', error);
       return {
-        content: "<a:redcross:1439044567415521443> **Linking Failed**\nAn internal error occurred while processing this request.",
+        content: "<a:redcross:1495393630112841839> **Linking Failed**\nAn internal error occurred while processing this request.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -152,7 +153,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:redcross:1439044567415521443> Could not identify user or guild.",
+              content: "<a:redcross:1495393630112841839> Could not identify user or guild.",
               flags: MessageFlags.Ephemeral,
             },
           },
@@ -242,7 +243,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:redcross:1439044567415521443> Failed to identify user or guild",
+              content: "<a:redcross:1495393630112841839> Failed to identify user or guild",
               flags: MessageFlags.Ephemeral,
             },
           },
@@ -267,7 +268,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:redcross:1439044567415521443> No player tag provided.",
+              content: "<a:redcross:1495393630112841839> No player tag provided.",
               flags: MessageFlags.Ephemeral,
             },
           },
@@ -373,7 +374,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:redcross:1439044567415521443> Could not identify user.",
+              content: "<a:redcross:1495393630112841839> Could not identify user.",
               flags: MessageFlags.Ephemeral,
             },
           }
@@ -388,7 +389,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:redcross:1439044567415521443> You don't have any linked CoC accounts yet.\n\nClick **Link Account** to add your first account!",
+              content: "<a:redcross:1495393630112841839> You don't have any linked CoC accounts yet.\n\nClick **Link Account** to add your first account!",
               flags: MessageFlags.Ephemeral,
             },
           }
@@ -408,10 +409,10 @@ export default {
         
         const statusLines = [];
         if (restoration.verifiedRoleAssigned) {
-          statusLines.push("<a:AnimatedCheck:1427570005750448169> **Verified role** has been restored!");
+          statusLines.push("<a:AnimatedCheck:1495392848072413275> **Verified role** has been restored!");
         }
         if (restoration.nicknameUpdated && restoration.mainAccount) {
-          statusLines.push(`<a:AnimatedCheck:1427570005750448169> **Nickname** set to: ${restoration.mainAccount.playerName}`);
+          statusLines.push(`<a:AnimatedCheck:1495392848072413275> **Nickname** set to: ${restoration.mainAccount.playerName}`);
         }
         
         if (statusLines.length > 0) {
@@ -422,17 +423,13 @@ export default {
       // Build account list with clan info
       let accountList = `${restorationStatus}**📋 Your Linked Accounts:**\n\n`;
       
-      const clanMap: Record<string, string> = {
-        WM: "WAR MASTER",
-        LE: "LEGENDS",
-        ZP: "ZwartePiet",
-        CH: "Clash Heros",
-        SP: "SP.OPS.DIVISION"
-      };
+      const boomClanLabel = userData.clan
+        ? await resolveUserClanLabel(userData.clan)
+        : null;
 
       userData.accounts.forEach((account, index) => {
         const isMain = account.isMain ? " ⭐" : "";
-        const clanInfo = userData.clan ? ` | ${clanMap[userData.clan] || userData.clan}` : "";
+        const clanInfo = boomClanLabel ? ` | ${boomClanLabel}` : "";
         accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${clanInfo}${isMain}\n`;
       });
 

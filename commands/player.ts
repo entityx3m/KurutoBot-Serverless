@@ -15,6 +15,7 @@ import type { PlayerAccount, UserData } from "../utils/dbHelper";
 import axios from "axios";
 import { API_URLS, MAIN_SERVER_ID } from "../utils/config";
 import { setMemberNickname } from "../utils/discordApi";
+import { resolveUserClanLabel } from "../utils/clanSetup";
 
 const COC_API_BASE_URL = API_URLS.COC_API_BASE;
 
@@ -130,17 +131,11 @@ async function renderPlayerStats(
   }
 
   if (userData.clan) {
-    const clanMap = {
-      WM: "WAR MASTER",
-      LE: "LEGENDS",
-      ZP: "ZwartePiet",
-      CH: "Clash Heros",
-      SP: "SP.OPS.DIVISION"
-    };
+    const clanLabel = await resolveUserClanLabel(userData.clan);
 
     embed.fields.push({
       name: "🏰 BOOM House",
-      value: `${clanMap[userData.clan as keyof typeof clanMap] || userData.clan}`,
+      value: clanLabel,
       inline: false
     });
   }
@@ -233,7 +228,7 @@ export default {
 
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+        content: "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -244,7 +239,7 @@ export default {
     const targetUserId = selectedUserId || interaction.member?.user?.id;
     if (!targetUserId) {
       return {
-        content: "<a:redcross:1439044567415521443> Could not identify the target user.",
+        content: "<a:redcross:1495393630112841839> Could not identify the target user.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -256,7 +251,7 @@ export default {
     
     if (!targetUser) {
       return {
-        content: "<a:redcross:1439044567415521443> Could not find the specified user.",
+        content: "<a:redcross:1495393630112841839> Could not find the specified user.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -276,7 +271,7 @@ export default {
 
         if (!response.ok) {
           return {
-            content: `<a:redcross:1439044567415521443> **Player Not Found**\nTag **#${playerTag}** not found.`,
+            content: `<a:redcross:1495393630112841839> **Player Not Found**\nTag **#${playerTag}** not found.`,
             flags: MessageFlags.Ephemeral,
           };
         }
@@ -302,7 +297,7 @@ export default {
         if (playerData.warPreference) {
           embed.fields.push({
             name: "⚔️ War Preference",
-            value: playerData.warPreference === "in" ? "Opted In <a:AnimatedCheck:1427570005750448169>" : "Opted Out <a:redcross:1439044567415521443>",
+            value: playerData.warPreference === "in" ? "Opted In <a:AnimatedCheck:1495392848072413275>" : "Opted Out <a:redcross:1495393630112841839>",
             inline: true
           });
         }
@@ -329,7 +324,7 @@ export default {
         };
       } catch (error) {
         return {
-          content: "<a:redcross:1439044567415521443> **Lookup Failed**\nAn internal error occurred while processing this request.",
+          content: "<a:redcross:1495393630112841839> **Lookup Failed**\nAn internal error occurred while processing this request.",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -367,7 +362,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:Warning:1456190079830720625> This button is not for you.",
+              content: "<a:Warning:1495394548984315904> This button is not for you.",
               flags: MessageFlags.Ephemeral
             }
           }
@@ -402,7 +397,7 @@ export default {
           await axios.patch(
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
-              content: `<a:redcross:1439044567415521443> Failed to fetch data for account #${selectedTag}`,
+              content: `<a:redcross:1495393630112841839> Failed to fetch data for account #${selectedTag}`,
               flags: MessageFlags.Ephemeral,
             },
             { headers: { "Content-Type": "application/json" } }
@@ -478,7 +473,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:Warning:1456190079830720625> This button is not for you.",
+              content: "<a:Warning:1495394548984315904> This button is not for you.",
               flags: MessageFlags.Ephemeral
             }
           }
@@ -506,7 +501,7 @@ export default {
           await axios.patch(
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
-              content: "<a:redcross:1439044567415521443> No user data found.",
+              content: "<a:redcross:1495393630112841839> No user data found.",
               flags: MessageFlags.Ephemeral,
             },
             { headers: { "Content-Type": "application/json" } }
@@ -529,7 +524,7 @@ export default {
           await axios.patch(
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
-              content: `<a:redcross:1439044567415521443> Account #${selectedTag} not found in your linked accounts.`,
+              content: `<a:redcross:1495393630112841839> Account #${selectedTag} not found in your linked accounts.`,
               flags: MessageFlags.Ephemeral,
             },
             { headers: { "Content-Type": "application/json" } }
@@ -558,7 +553,7 @@ export default {
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           {
-            content: `<a:AnimatedCheck:1427570005750448169> **Main Account Updated!**\n\n⭐ **${mainAccount?.playerName}** (#${selectedTag}) is now your main account.\n\nYour nickname has been updated.`,
+            content: `<a:AnimatedCheck:1495392848072413275> **Main Account Updated!**\n\n⭐ **${mainAccount?.playerName}** (#${selectedTag}) is now your main account.\n\nYour nickname has been updated.`,
           },
           { headers: { "Content-Type": "application/json" } }
         );

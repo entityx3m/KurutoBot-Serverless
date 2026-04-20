@@ -26,19 +26,19 @@ export default {
     // BLOCK OTHER SERVERS
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+        content: "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
     
     try {
       const embed = {
-        title: " <a:ClashOfClansLogo:1456185647563018330> Unlock Server Access",
+        title: " <a:ClashOfClansLogo:1495394986504622194> Unlock Server Access",
         description: "To prevent spam, you must link your CoC account to open a ticket.\n\n**1️⃣ Step 1: Link Account**\nClick the button below to verify. This grants you the **Verified Role**.\n\n**2️⃣ Step 2: Open a Ticket**\nOnce verified, the panel above will unlock options for:\n🎟️ **Apply to Join**\n🛡️ **Chat with Staff**",
         color: 0x5865F2,
         fields: [
           {
-            name: "<a:rg_blink:1456183866510282762> Quick Navigation",
+            name: "<a:rg_blink:1495395281540218900> Quick Navigation",
             value: `Verified? [**Click here to Create a Ticket**](${EXTERNAL_LINKS.TICKET_CREATION_URL})`,
             inline: false
           }
@@ -84,14 +84,14 @@ export default {
       });
       
       return {
-        content: "<a:AnimatedCheck:1427570005750448169> Account linking embed posted!",
+        content: "<a:AnimatedCheck:1495392848072413275> Account linking embed posted!",
         flags: MessageFlags.Ephemeral,
       };
       
     } catch (error) {
       console.error("Error posting link embed:", error);
       return {
-        content: "<a:redcross:1439044567415521443> Failed to post linking embed",
+        content: "<a:redcross:1495393630112841839> Failed to post linking embed",
         flags: MessageFlags.Ephemeral,
       };
     }
