@@ -30,7 +30,7 @@ export default {
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
         content:
-          "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+          "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -40,7 +40,7 @@ export default {
     const guildId = interaction.guild_id;
     if (!userId || !channelId || !guildId) {
       return {
-        content: "<a:redcross:1439044567415521443> Could not identify context.",
+        content: "<a:redcross:1495393630112841839> Could not identify context.",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -50,7 +50,7 @@ export default {
       if (!ticketContext) {
         return {
           content:
-            "<a:redcross:1439044567415521443> This command can only be used inside a ticket channel.",
+            "<a:redcross:1495393630112841839> This command can only be used inside a ticket channel.",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -59,7 +59,7 @@ export default {
       if (!hasPermission) {
         return {
           content:
-            "<a:redcross:1439044567415521443> You don't have permission to close this ticket.",
+            "<a:redcross:1495393630112841839> You don't have permission to close this ticket.",
           flags: MessageFlags.Ephemeral,
         };
       }
@@ -100,13 +100,13 @@ export default {
       });
 
       return {
-        content: "<a:AnimatedCheck:1427570005750448169> Confirmation sent.",
+        content: "<a:AnimatedCheck:1495392848072413275> Confirmation sent.",
         flags: MessageFlags.Ephemeral,
       };
     } catch (error) {
       console.error("Error in closeticket command:", error);
       return {
-        content: `<a:redcross:1439044567415521443> Failed to initiate close: ${
+        content: `<a:redcross:1495393630112841839> Failed to initiate close: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
         flags: MessageFlags.Ephemeral,
@@ -134,7 +134,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:Warning:1456190079830720625> This button is not for you.",
+              content: "<a:Warning:1495394548984315904> This button is not for you.",
               flags: MessageFlags.Ephemeral,
             },
           }
@@ -160,7 +160,7 @@ export default {
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           {
-            content: "<a:redcross:1439044567415521443> Failed to close ticket.",
+            content: "<a:redcross:1495393630112841839> Failed to close ticket.",
           }
         );
       }
@@ -183,7 +183,7 @@ export default {
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:Warning:1456190079830720625> This button is not for you.",
+              content: "<a:Warning:1495394548984315904> This button is not for you.",
               flags: MessageFlags.Ephemeral,
             },
           }
@@ -202,7 +202,7 @@ export default {
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           {
-            content: "<a:redcross:1439044567415521443> Ticket close cancelled.",
+            content: "<a:redcross:1495393630112841839> Ticket close cancelled.",
             components: [], // Remove buttons
           }
         );
