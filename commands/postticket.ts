@@ -41,7 +41,7 @@ export default {
 
     if (interaction.guild_id !== MAIN_SERVER_ID) {
       return {
-        content: "<a:redcross:1439044567415521443> This command only works in the BOOM House server!",
+        content: "<a:redcross:1495393630112841839> This command only works in the BOOM House server!",
         flags: MessageFlags.Ephemeral,
       };
     }
@@ -189,7 +189,7 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
         if (!hasPermission) {
           await axios.patch(
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
-            { content: "<a:redcross:1439044567415521443> You don't have permission to close this ticket." }
+            { content: "<a:redcross:1495393630112841839> You don't have permission to close this ticket." }
           );
           return;
         }
@@ -232,13 +232,13 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
         // Optionally, edit the original button message to indicate confirmation sent
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
-          { content: "<a:AnimatedCheck:1427570005750448169> Confirmation sent." }
+          { content: "<a:AnimatedCheck:1495392848072413275> Confirmation sent." }
         );
       } catch (error) {
         console.error("Error initiating ticket close:", error);
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
-          { content: "<a:redcross:1439044567415521443> Failed to initiate close." }
+          { content: "<a:redcross:1495393630112841839> Failed to initiate close." }
         );
       }
     },
@@ -254,7 +254,7 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:Warning:1456190079830720625> This button is not for you.",
+              content: "<a:Warning:1495394548984315904> This button is not for you.",
               flags: MessageFlags.Ephemeral,
             },
           }
@@ -276,7 +276,7 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
         console.error("Error closing ticket:", error);
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
-          { content: "<a:redcross:1439044567415521443> Failed to close ticket." }
+          { content: "<a:redcross:1495393630112841839> Failed to close ticket." }
         );
       }
     },
@@ -291,7 +291,7 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
           {
             type: InteractionResponseType.ChannelMessageWithSource,
             data: {
-              content: "<a:Warning:1456190079830720625> This button is not for you.",
+              content: "<a:Warning:1495394548984315904> This button is not for you.",
               flags: MessageFlags.Ephemeral,
             },
           }
@@ -308,7 +308,7 @@ Thank you for your interest in BOOM House — where excellence in war and unity 
         await axios.patch(
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           {
-            content: "<a:redcross:1439044567415521443> Ticket close cancelled.",
+            content: "<a:redcross:1495393630112841839> Ticket close cancelled.",
             components: [],
           }
         );
@@ -336,7 +336,7 @@ async function handleTicketButton(interaction: SimplifiedInteraction, type: stri
     await sendEphemeralReply(
       interaction.id,
       interaction.token,
-      "<a:redcross:1439044567415521443> You must link your Clash of Clans account first!\nUse `/link` or the **Link Account** button to get verified."
+      "<a:redcross:1495393630112841839> You must link your Clash of Clans account first!\nUse `/link` or the **Link Account** button to get verified."
     );
     return;
   }
@@ -537,7 +537,7 @@ Thank you for your interest in joining the **Boom House Alliance Staff Team!** �
     await axios.post(
       `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}`,
       {
-        content: `<a:AnimatedCheck:1427570005750448169> Your ticket has been created: <#${channel.id}>`,
+        content: `<a:AnimatedCheck:1495392848072413275> Your ticket has been created: <#${channel.id}>`,
         flags: MessageFlags.Ephemeral,
       }
     );
@@ -546,7 +546,7 @@ Thank you for your interest in joining the **Boom House Alliance Staff Team!** �
     await axios.patch(
       `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
       {
-        content: "<a:redcross:1439044567415521443> Failed to create ticket due to an internal error.",
+        content: "<a:redcross:1495393630112841839> Failed to create ticket due to an internal error.",
       }
     );
   }
