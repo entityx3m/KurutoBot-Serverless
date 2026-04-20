@@ -9,7 +9,7 @@ export interface SimplifiedInteraction {
   data: {
     id: string;
     name: string;
-    options?: { name: string; type: number; value: string }[];
+    options?: InteractionDataOption[];
     resolved?: {
       attachments?: {
         [key: string]: {
@@ -98,6 +98,19 @@ export type CommandExecute = (data: {
   interaction: SimplifiedInteraction;
 }) => CommandExecuteResult;
 
+export type CommandAutocompleteChoice = {
+  name: string;
+  value: string | number;
+};
+
+export type CommandAutocompleteResult = Promise<{
+  choices: CommandAutocompleteChoice[];
+}>;
+
+export type CommandAutocomplete = (data: {
+  interaction: SimplifiedInteraction;
+}) => CommandAutocompleteResult;
+
 // Handler function type for buttons/modals
 export type ComponentHandler = (data: {
   interaction: SimplifiedInteraction;
@@ -111,7 +124,16 @@ export type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
 export interface Command {
   data: CommandData;
   execute: CommandExecute;
+  autocomplete?: CommandAutocomplete;
   // Dictionary of handlers
   // Key = custom_id prefix (e.g., "force_add_confirm")
   handlers?: Record<string, ComponentHandler>;
+}
+
+export interface InteractionDataOption {
+  name: string;
+  type: number;
+  value?: string | number | boolean;
+  options?: InteractionDataOption[];
+  focused?: boolean;
 }
