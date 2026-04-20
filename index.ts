@@ -195,7 +195,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           commandResult = await command.execute({ interaction: message });
         } catch (error) {
           logger.error("Error executing command", { commandName, error });
-          commandResult = { content: "An error occurred.", flags: MessageFlags.Ephemeral };
+          commandResult = { content: "An error occurred." };
         }
 
         // Reply
@@ -204,7 +204,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             content: commandResult?.content ?? "",
             embeds: commandResult?.embeds || [],
             components: commandResult?.components || [],
-            flags: commandResult?.flags,
           };
 
           await axios.patch(
