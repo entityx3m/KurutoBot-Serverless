@@ -9,6 +9,7 @@ import {
 import type {
   CommandData,
   CommandExecuteResult,
+  InteractionDataOption,
   SimplifiedInteraction,
 } from "../utils/types";
 import {
@@ -21,19 +22,15 @@ import {
 } from "../utils/clanSetup";
 import { MAIN_SERVER_ID } from "../utils/config";
 
-type InteractionOption = {
-  name: string;
-  type?: number;
-  value?: string;
-  options?: InteractionOption[];
-};
-
-function getSubcommandOptions(options: InteractionOption[] | undefined, subcommandName: string): InteractionOption[] {
+function getSubcommandOptions(
+  options: InteractionDataOption[] | undefined,
+  subcommandName: string,
+): InteractionDataOption[] {
   const subcommand = options?.find((option) => option.name === subcommandName);
   return subcommand?.options || [];
 }
 
-function getOptionValue(options: InteractionOption[] | undefined, name: string): string | undefined {
+function getOptionValue(options: InteractionDataOption[] | undefined, name: string): string | undefined {
   const option = options?.find((entry) => entry.name === name);
   if (!option) return undefined;
   return typeof option.value === "string" ? option.value : undefined;
