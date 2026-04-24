@@ -246,7 +246,6 @@ export default {
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
               content: "<a:redcross:1495393630112841839> No user data found.",
-              flags: MessageFlags.Ephemeral,
             }
           );
           return;
@@ -259,7 +258,6 @@ export default {
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
               content: `<a:redcross:1495393630112841839> Account #${playerTag} not found.`,
-              flags: MessageFlags.Ephemeral,
             }
           );
           return;
@@ -339,7 +337,6 @@ export default {
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           {
             content: `<a:redcross:1495393630112841839> **Unlink Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
-            flags: MessageFlags.Ephemeral,
           }
         );
       }
