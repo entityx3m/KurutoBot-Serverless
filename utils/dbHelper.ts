@@ -272,6 +272,7 @@ export async function getAccountByTag(playerTag: string): Promise<{userId: strin
       return null;
     }
     if (!data) return null;
+    if (!data.discord_id) return null;
 
     return { userId: data.discord_id, account: mapAccountRowToModel(data) };
   } catch (error) {

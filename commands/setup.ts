@@ -109,7 +109,7 @@ export default {
       };
     }
 
-    const options = interaction.data.options as InteractionOption[] | undefined;
+    const options = interaction.data.options as InteractionDataOption[] | undefined;
     const clanOptions = getSubcommandOptions(options, "clan");
     const action = getOptionValue(clanOptions, "action");
 

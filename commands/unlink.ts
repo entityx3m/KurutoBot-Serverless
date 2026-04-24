@@ -89,7 +89,7 @@ export default {
         accountList += `${index + 1}. **${account.playerName}** (#${account.playerTag}) | TH${account.townHallLevel}${isMain}\n`;
         
         // Add button for each account (max 5 per row, Discord limit)
-        const button = {
+        const button: ButtonComponent = {
           type: 2,
           style: 2, // SECONDARY
           custom_id: `unlink_account:${account.playerTag}:${userId}`,
@@ -246,7 +246,6 @@ export default {
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
               content: "<a:redcross:1495393630112841839> No user data found.",
-              flags: MessageFlags.Ephemeral,
             }
           );
           return;
@@ -259,7 +258,6 @@ export default {
             `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
             {
               content: `<a:redcross:1495393630112841839> Account #${playerTag} not found.`,
-              flags: MessageFlags.Ephemeral,
             }
           );
           return;
@@ -339,7 +337,6 @@ export default {
           `https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`,
           {
             content: `<a:redcross:1495393630112841839> **Unlink Failed**\n${error instanceof Error ? error.message : 'Unknown error'}`,
-            flags: MessageFlags.Ephemeral,
           }
         );
       }

@@ -227,35 +227,39 @@ function formatLeaderboardRow(entry: LeaderboardEntry, index: number): string {
 
 function buildComponents(scope: LeaderboardScope, page: number, totalPages: number) {
   const pageTag = scope.clanTag || "all";
-  const previousPage = Math.max(1, page - 1);
-  const nextPage = Math.min(totalPages, page + 1);
+  const maxSelectablePages = Math.min(totalPages, 25);
+  const pageOptions = Array.from({ length: maxSelectablePages }, (_, index) => {
+    const pageNumber = index + 1;
+    return {
+      label: `Page ${pageNumber}`,
+      value: String(pageNumber),
+      default: pageNumber === page,
+    };
+  });
 
   return [
     {
       type: 1,
       components: [
         {
-          type: 2,
-          style: 1,
-          custom_id: `legend_lb:prev:${pageTag}:${previousPage}`,
-          label: "Prev",
-          emoji: { name: "⬅️" },
-          disabled: page <= 1,
+          type: 3,
+          custom_id: `legend_lb:select:${pageTag}`,
+          placeholder: `Jump to page (current: ${page}/${totalPages})`,
+          min_values: 1,
+          max_values: 1,
+          options: pageOptions,
         },
+      ],
+    },
+    {
+      type: 1,
+      components: [
         {
           type: 2,
           style: 2,
           custom_id: `legend_lb:refresh:${pageTag}:${page}`,
           label: "Refresh",
           emoji: { name: "🔄" },
-        },
-        {
-          type: 2,
-          style: 1,
-          custom_id: `legend_lb:next:${pageTag}:${nextPage}`,
-          label: "Next",
-          emoji: { name: "➡️" },
-          disabled: page >= totalPages,
         },
       ],
     },
@@ -311,7 +315,7 @@ async function renderLeaderboard(scope: LeaderboardScope, page: number, forceRef
 
   const embeds = [{
     title: `🏆 Legend Leaderboard${scope.clanTag ? ` - ${scope.clanName}` : " - BOOM House Alliance"}`,
-    color: 0x5865F2,
+    color: 0x3A0093,
     description,
     footer: {
       text: `Page ${leaderboardPage.currentPage}/${leaderboardPage.totalPages} • ${leaderboardPage.scopeLabel} • Updated ${new Date(leaderboardPage.refreshedAt).toLocaleString()}`,
@@ -391,11 +395,12 @@ export default {
   handlers: {
     "legend_lb": async ({ interaction, args }: { interaction: SimplifiedInteraction; args: string[] }) => {
       const [action, scopeTag, pageValue] = args;
-      if (!action || !["prev", "next", "refresh"].includes(action)) {
+      if (!action || !["select", "refresh"].includes(action)) {
         return;
       }
 
-      const page = getPageValue(pageValue);
+      const selectedPage = interaction.data.values?.[0];
+      const page = action === "select" ? getPageValue(selectedPage) : getPageValue(pageValue);
 
       const resolvedScope = await resolveScope(scopeTag === "all" ? undefined : scopeTag);
       if (!resolvedScope) {
